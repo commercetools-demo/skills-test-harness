@@ -41,18 +41,16 @@ on:
         required: false
 
 jobs:
-  scaffold-and-test:
+  # ── 1. Scaffold ─────────────────────────────────────────────────────────────
+  scaffold:
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
     permissions:
       id-token: write
       contents: write
     outputs:
-      score: ${{ steps.parse-judge.outputs.score }}
-      critical_count: ${{ steps.parse-judge.outputs.critical_count }}
-      high_count: ${{ steps.parse-judge.outputs.high_count }}
-      medium_count: ${{ steps.parse-judge.outputs.medium_count }}
-      preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
+      app_dir: ${{ steps.verify-output.outputs.app_dir }}
+      check_run_id: ${{ steps.check.outputs.check_run_id }}
 
     steps:
       - name: Checkout harness
@@ -132,17 +130,57 @@ jobs:
           echo "Top-level structure:"; ls output/
 
       - name: Run static checks (warnings only)
-        id: static-checks
         run: |
           bash tests/static-checks-${{ inputs.skill_slug }}.sh ./output/ | tee static-check-results.txt || true
           echo "Static checks complete (warnings only, not blocking)"
+
+      - name: Upload output artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: |
+            output/
+            !output/**/node_modules/**
+          if-no-files-found: warn
+
+      - name: Upload static check results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-checks-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: static-check-results.txt
+          if-no-files-found: ignore
+
+  # ── 2a. Judge (parallel with deploy) ────────────────────────────────────────
+  judge:
+    needs: scaffold
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.skill_slug }}
+    permissions:
+      id-token: write
+      contents: write
+    outputs:
+      score: ${{ steps.parse-judge.outputs.score }}
+      critical_count: ${{ steps.parse-judge.outputs.critical_count }}
+      high_count: ${{ steps.parse-judge.outputs.high_count }}
+      medium_count: ${{ steps.parse-judge.outputs.medium_count }}
+
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Download output artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: output/
 
       - name: Build judge prompt
         id: judge-prompt
         run: |
           python3 - <<'PYEOF'
           import os, secrets
-          content = open(f'prompts/judge-${{ inputs.skill_slug }}.md').read()
+          content = open('prompts/judge-${{ inputs.skill_slug }}.md').read()
           delim = 'JUDGE_' + secrets.token_hex(16)
           with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
               f.write(f'content<<{delim}\n{content}\n{delim}\n')
@@ -160,14 +198,40 @@ jobs:
         id: parse-judge
         run: node scripts/parse-judge-output.mjs
 
+      - name: Upload judge result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: judge-result-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: judge-result.json
+          if-no-files-found: ignore
+
+  # ── 2b. Deploy + Playwright (parallel with judge) ───────────────────────────
+  deploy:
+    needs: scaffold
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.skill_slug }}
+    if: inputs.deploy == true
+    outputs:
+      preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
+
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Download output artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: output/
+
       - name: Deploy to Netlify
         id: netlify-deploy
-        if: inputs.deploy == true
         run: node scripts/setup-netlify-site.mjs
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           SKILL_SLUG: ${{ inputs.skill_slug }}
-          APP_DIR: ${{ steps.verify-output.outputs.app_dir }}
+          APP_DIR: ${{ needs.scaffold.outputs.app_dir }}
           CTP_AUTH_URL: ${{ vars.CTP_AUTH_URL }}
           CTP_API_URL: ${{ vars.CTP_API_URL }}
           CTP_PROJECT_KEY: ${{ vars.CTP_PROJECT_KEY }}
@@ -178,14 +242,12 @@ jobs:
 
       - name: Wait for Netlify deploy
         id: wait-deploy
-        if: inputs.deploy == true
         run: node scripts/wait-for-netlify-deploy.mjs
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           SKILL_SLUG: ${{ inputs.skill_slug }}
 
       - name: Run Playwright E2E tests
-        if: inputs.deploy == true
         run: |
           cd tests/playwright
           npm ci
@@ -194,8 +256,63 @@ jobs:
         env:
           BASE_URL: ${{ steps.wait-deploy.outputs.preview_url }}
 
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: tests/playwright/playwright-report/
+          if-no-files-found: ignore
+
+  # ── 3. Finalize ──────────────────────────────────────────────────────────────
+  finalize:
+    needs: [scaffold, judge, deploy]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.skill_slug }}
+    if: always()
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.HARNESS_APP_ID }}
+          private-key: ${{ secrets.HARNESS_APP_PRIVATE_KEY }}
+          owner: commercetools-demo
+
+      - name: Download output artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: output/
+        continue-on-error: true
+
+      - name: Download judge result
+        uses: actions/download-artifact@v4
+        with:
+          name: judge-result-${{ inputs.skill_slug }}-${{ github.run_id }}
+        continue-on-error: true
+
+      - name: Compute overall status
+        id: status
+        run: |
+          SCAFFOLD="${{ needs.scaffold.result }}"
+          JUDGE="${{ needs.judge.result }}"
+          DEPLOY="${{ needs.deploy.result }}"
+          if [ "$SCAFFOLD" = "success" ] && [ "$JUDGE" = "success" ] && \
+             ( [ "$DEPLOY" = "success" ] || [ "$DEPLOY" = "skipped" ] ); then
+            echo "value=success" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=failure" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Push output to skills-scaffold (preview branch)
-        if: always() && inputs.publish == false
+        if: inputs.publish == false
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -209,7 +326,7 @@ jobs:
           TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
 
       - name: Publish to skills-scaffold (canonical branch)
-        if: always() && inputs.publish == true
+        if: inputs.publish == true
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -221,40 +338,26 @@ jobs:
           SKILL_SLUG: ${{ inputs.skill_slug }}
           HARNESS_SHA: ${{ github.sha }}
 
-      - name: Upload artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: harness-${{ inputs.skill_slug }}-${{ github.sha }}
-          path: |
-            judge-result.json
-            static-check-results.txt
-            /home/runner/work/_temp/claude-execution-output.json
-            tests/playwright/playwright-report/
-          if-no-files-found: ignore
-
       - name: Update check run with result
-        if: always()
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           node scripts/update-check-run.mjs \
-            --check-run-id "${{ steps.check.outputs.check_run_id }}" \
-            --status "${{ job.status }}" \
+            --check-run-id "${{ needs.scaffold.outputs.check_run_id }}" \
+            --status "${{ steps.status.outputs.value }}" \
             --skill-slug "${{ inputs.skill_slug }}" \
             --judge-output judge-result.json \
-            --preview-url "${{ steps.wait-deploy.outputs.preview_url }}" \
+            --preview-url "${{ needs.deploy.outputs.preview_url }}" \
             --published-branch "${{ inputs.publish && format('{0}/main', inputs.skill_slug) || '' }}"
 
       - name: Post Slack notification
-        if: always()
         env:
           SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
         run: |
           node scripts/post-slack-notification.mjs \
             --skill-slug "${{ inputs.skill_slug }}" \
             --skill-name "${{ inputs.skill_name }}" \
-            --preview-url "${{ steps.wait-deploy.outputs.preview_url }}" \
+            --preview-url "${{ needs.deploy.outputs.preview_url }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-            --status "${{ job.status }}" \
+            --status "${{ steps.status.outputs.value }}" \
             --skills-ref "${{ inputs.skills_repo_ref }}"
