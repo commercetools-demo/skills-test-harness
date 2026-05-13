@@ -86,10 +86,10 @@ jobs:
             $EXTRA_ARGS
 
       - name: Scaffold storefront with Claude Code
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt_file: prompts/scaffold-${{ inputs.skill_slug }}.md
+          prompt_file: ${{ github.workspace }}/prompts/scaffold-${{ inputs.skill_slug }}.md
           claude_args: --max-turns 200
           mode: agent
 
@@ -108,10 +108,10 @@ jobs:
           echo "Static checks complete (warnings only, not blocking)"
 
       - name: Grade output with Claude Code (judge)
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@beta
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt_file: prompts/judge-${{ inputs.skill_slug }}.md
+          prompt_file: ${{ github.workspace }}/prompts/judge-${{ inputs.skill_slug }}.md
           mode: agent
 
       - name: Parse judge output
