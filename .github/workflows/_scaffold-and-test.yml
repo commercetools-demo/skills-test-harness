@@ -88,8 +88,9 @@ jobs:
       - name: Read scaffold prompt
         id: scaffold-prompt
         run: |
+          DELIM="__SCAFFOLD_PROMPT_$(openssl rand -hex 8)__"
           {
-            echo 'content<<PROMPT_EOF'
+            echo "content<<${DELIM}"
             cat "prompts/scaffold-${{ inputs.skill_slug }}.md"
             if [ -f ".harness-instructions.md" ]; then
               echo ""
@@ -97,7 +98,7 @@ jobs:
               echo ""
               cat ".harness-instructions.md"
             fi
-            echo 'PROMPT_EOF'
+            echo "${DELIM}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Scaffold storefront with Claude Code
@@ -134,10 +135,11 @@ jobs:
       - name: Read judge prompt
         id: judge-prompt
         run: |
+          DELIM="__JUDGE_PROMPT_$(openssl rand -hex 8)__"
           {
-            echo 'content<<PROMPT_EOF'
+            echo "content<<${DELIM}"
             cat "prompts/judge-${{ inputs.skill_slug }}.md"
-            echo 'PROMPT_EOF'
+            echo "${DELIM}"
           } >> "$GITHUB_OUTPUT"
 
       - name: Grade output with Claude Code (judge)
