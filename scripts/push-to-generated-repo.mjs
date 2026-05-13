@@ -57,7 +57,11 @@ try {
   } catch {
     console.log(`Branch ${BRANCH} not found — creating orphan branch`);
     run(`git -C "${tmpDir}" checkout --orphan "${BRANCH}"`);
-    run(`git -C "${tmpDir}" rm -rf .`, { stdio: 'pipe' }).toString();
+    try {
+      run(`git -C "${tmpDir}" rm -rf .`, { stdio: 'pipe' });
+    } catch {
+      // empty repo — nothing to remove
+    }
   }
 
   // 3. Delete everything in the worktree (except .git/)
