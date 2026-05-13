@@ -86,7 +86,7 @@ jobs:
             $EXTRA_ARGS
 
       - name: Scaffold storefront with Claude Code
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt_file: ${{ github.workspace }}/prompts/scaffold-${{ inputs.skill_slug }}.md
@@ -108,7 +108,7 @@ jobs:
           echo "Static checks complete (warnings only, not blocking)"
 
       - name: Grade output with Claude Code (judge)
-        uses: anthropics/claude-code-action@beta
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt_file: ${{ github.workspace }}/prompts/judge-${{ inputs.skill_slug }}.md
