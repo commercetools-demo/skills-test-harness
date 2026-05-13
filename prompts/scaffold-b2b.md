@@ -1,7 +1,13 @@
+This is an automated CI run. Do not ask any questions, request clarification, or wait for user input at any point. Make reasonable assumptions and proceed autonomously to completion.
+
 Read the skill file at `.claude/skills/commercetools-b2b-storefront/SKILL.md` in full.
 Then read every file under `.claude/skills/commercetools-b2b-storefront/references/` in full.
 
-Using the knowledge from those files, generate a complete B2B storefront in `./output/`.
+Using the knowledge from those files, generate a complete B2B storefront.
+
+## Output location
+
+Write ALL generated files under `./output/`. You may use subdirectories as the skill prescribes (e.g. `output/site/`, `output/tools/`). The Next.js app root must contain a `package.json`.
 
 ## Build order
 

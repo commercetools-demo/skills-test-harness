@@ -21,7 +21,7 @@ if (!HARNESS_SHA) {
 }
 
 const REMOTE_URL = `https://x-access-token:${GITHUB_TOKEN}@github.com/commercetools-demo/skills-scaffold.git`;
-const BRANCH = `${SKILL_SLUG}/main`;
+const BRANCH = process.env.TARGET_BRANCH || `${SKILL_SLUG}/main`;
 
 let tmpDir;
 

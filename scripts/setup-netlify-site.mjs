@@ -3,6 +3,7 @@ import { execSync } from 'child_process';
 
 const NETLIFY_AUTH_TOKEN = process.env.NETLIFY_AUTH_TOKEN;
 const SKILL_SLUG = process.env.SKILL_SLUG;
+const APP_DIR = process.env.APP_DIR || './output';
 const CTP_AUTH_URL = process.env.CTP_AUTH_URL;
 const CTP_API_URL = process.env.CTP_API_URL;
 const CTP_PROJECT_KEY = process.env.CTP_PROJECT_KEY;
@@ -85,8 +86,8 @@ async function setSiteEnvVars(siteId) {
 
 // 7. Deploy via zip
 async function deployZip(siteId) {
-  console.log('Creating output.zip...');
-  execSync('cd ./output && zip -r ../output.zip .', { stdio: 'inherit' });
+  console.log(`Creating output.zip from ${APP_DIR}...`);
+  execSync(`cd "${APP_DIR}" && zip -r "${process.cwd()}/output.zip" .`, { stdio: 'inherit' });
 
   const { readFileSync } = await import('fs');
   const zipBuffer = readFileSync('./output.zip');

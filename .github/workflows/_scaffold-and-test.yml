@@ -99,16 +99,25 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.scaffold-prompt.outputs.content }}
-          claude_args: --max-turns 200
+          claude_args: --max-turns 200 --dangerously-skip-permissions
           mode: agent
+          allowed_bots: '*'
 
       - name: Verify output exists
+        id: verify-output
         run: |
-          if [ ! -f output/package.json ]; then
-            echo "::error::Scaffold did not produce output/package.json"
+          PKG=$(find output -name package.json | head -1)
+          if [ -z "$PKG" ]; then
+            echo "::error::Scaffold did not produce a package.json anywhere under ./output/"
+            echo "Contents of output/:"
+            find output -maxdepth 3 2>/dev/null || echo "(output/ is empty or missing)"
             exit 1
           fi
-          echo "Output verified: $(ls output | wc -l) items at root"
+          APP_DIR=$(dirname "$PKG")
+          echo "app_dir=$APP_DIR" >> "$GITHUB_OUTPUT"
+          echo "Output package.json found at: $PKG"
+          echo "App directory: $APP_DIR"
+          echo "Top-level structure:"; ls output/
 
       - name: Run static checks (warnings only)
         id: static-checks
@@ -131,6 +140,7 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.judge-prompt.outputs.content }}
           mode: agent
+          allowed_bots: '*'
 
       - name: Parse judge output
         id: parse-judge
@@ -143,6 +153,7 @@ jobs:
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           SKILL_SLUG: ${{ inputs.skill_slug }}
+          APP_DIR: ${{ steps.verify-output.outputs.app_dir }}
           CTP_AUTH_URL: ${{ vars.CTP_AUTH_URL }}
           CTP_API_URL: ${{ vars.CTP_API_URL }}
           CTP_PROJECT_KEY: ${{ vars.CTP_PROJECT_KEY }}
@@ -169,9 +180,28 @@ jobs:
         env:
           BASE_URL: ${{ steps.wait-deploy.outputs.preview_url }}
 
-      - name: Publish to skills-scaffold
-        if: inputs.publish == true
-        run: node scripts/push-to-generated-repo.mjs
+      - name: Push output to skills-scaffold (preview branch)
+        if: always() && inputs.publish == false
+        run: |
+          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
+            echo "output/ is empty — nothing to push"
+            exit 0
+          fi
+          node scripts/push-to-generated-repo.mjs
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+          HARNESS_SHA: ${{ github.sha }}
+          TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
+
+      - name: Publish to skills-scaffold (canonical branch)
+        if: always() && inputs.publish == true
+        run: |
+          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
+            echo "output/ is empty — nothing to push"
+            exit 0
+          fi
+          node scripts/push-to-generated-repo.mjs
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           SKILL_SLUG: ${{ inputs.skill_slug }}
@@ -185,6 +215,7 @@ jobs:
           path: |
             judge-result.json
             static-check-results.txt
+            /home/runner/work/_temp/claude-execution-output.json
             tests/playwright/playwright-report/
           if-no-files-found: ignore
 
