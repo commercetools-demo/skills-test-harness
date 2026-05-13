@@ -113,7 +113,6 @@ jobs:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.scaffold-prompt.outputs.content }}
           claude_args: --max-turns 200 --dangerously-skip-permissions
-          mode: agent
           allowed_bots: '*'
 
       - name: Verify output exists
@@ -155,7 +154,6 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.judge-prompt.outputs.content }}
-          mode: agent
           allowed_bots: '*'
 
       - name: Parse judge output
