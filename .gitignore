@@ -1,0 +1,9 @@
+node_modules/
+.claude/
+output/
+judge-result.json
+static-check-results.txt
+netlify-deploy.json
+output.zip
+tests/playwright/playwright-report/
+tests/playwright/test-results/

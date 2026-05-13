@@ -1,0 +1,30 @@
+name: B2C — Validate skill from skills repo
+
+on:
+  repository_dispatch:
+    types: [b2c-validate]
+  workflow_dispatch:
+    inputs:
+      skills_repo_ref:
+        description: 'Branch in commercetools-demo/skills to test'
+        required: true
+        default: 'main'
+      skills_repo_sha:
+        description: 'Commit SHA (optional — for check run attachment)'
+        required: false
+
+concurrency:
+  group: b2c-validate-${{ github.event.client_payload.skills_repo_ref || inputs.skills_repo_ref }}
+  cancel-in-progress: true
+
+jobs:
+  scaffold-and-test:
+    uses: ./.github/workflows/_scaffold-and-test.yml
+    with:
+      skill_name: commercetools-b2c-storefront
+      skill_slug: b2c
+      skills_repo_ref: ${{ github.event.client_payload.skills_repo_ref || inputs.skills_repo_ref }}
+      skills_repo_sha: ${{ github.event.client_payload.skills_repo_sha || inputs.skills_repo_sha || '' }}
+      publish: false
+      deploy: true
+    secrets: inherit

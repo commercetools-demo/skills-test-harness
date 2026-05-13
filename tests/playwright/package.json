@@ -1,0 +1,12 @@
+{
+  "name": "harness-playwright",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:b2c": "playwright test b2c/",
+    "test:b2b": "playwright test b2b/"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0"
+  }
+}

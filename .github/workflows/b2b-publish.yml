@@ -1,0 +1,27 @@
+name: B2B — Publish to generated-storefronts
+
+on:
+  repository_dispatch:
+    types: [b2b-publish]
+  workflow_dispatch:
+    inputs:
+      skills_repo_ref:
+        description: 'Branch in commercetools-demo/skills (use main)'
+        required: true
+        default: 'main'
+
+concurrency:
+  group: b2b-publish
+  cancel-in-progress: false
+
+jobs:
+  scaffold-and-publish:
+    uses: ./.github/workflows/_scaffold-and-test.yml
+    with:
+      skill_name: commercetools-b2b-storefront
+      skill_slug: b2b
+      skills_repo_ref: ${{ github.event.client_payload.skills_repo_ref || inputs.skills_repo_ref }}
+      skills_repo_sha: ${{ github.event.client_payload.skills_repo_sha || '' }}
+      publish: true
+      deploy: false
+    secrets: inherit

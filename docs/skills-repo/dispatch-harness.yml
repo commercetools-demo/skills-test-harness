@@ -1,0 +1,81 @@
+# This file belongs in commercetools-demo/skills at .github/workflows/dispatch-harness.yml
+# It dispatches the skills-test-harness to validate or publish whenever a skill changes.
+
+name: Dispatch to test harness
+
+on:
+  push:
+    paths:
+      - 'skills/commercetools-b2c-storefront/**'
+      - 'skills/commercetools-b2b-storefront/**'
+      - '.github/workflows/dispatch-harness.yml'
+  workflow_dispatch:
+    inputs:
+      skill:
+        description: 'Which skill to dispatch'
+        required: true
+        type: choice
+        options: [b2c, b2b, both]
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect changed skills
+        id: changes
+        if: github.event_name == 'push'
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            b2c:
+              - 'skills/commercetools-b2c-storefront/**'
+            b2b:
+              - 'skills/commercetools-b2b-storefront/**'
+
+      - name: Determine event suffix (validate vs publish)
+        id: suffix
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "value=publish" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=validate" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mint App token for harness dispatch
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HARNESS_APP_ID }}
+          private-key: ${{ secrets.HARNESS_APP_PRIVATE_KEY }}
+          owner: commercetools-demo
+          repositories: skills-test-harness
+
+      - name: Dispatch b2c
+        if: |
+          (github.event_name == 'push' && steps.changes.outputs.b2c == 'true') ||
+          (github.event_name == 'workflow_dispatch' && (inputs.skill == 'b2c' || inputs.skill == 'both'))
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api repos/commercetools-demo/skills-test-harness/dispatches \
+            -f event_type="b2c-${{ steps.suffix.outputs.value }}" \
+            -F client_payload[skills_repo_ref]="${{ github.ref_name }}" \
+            -F client_payload[skills_repo_sha]="${{ github.sha }}" \
+            -F client_payload[trigger_actor]="${{ github.actor }}"
+
+      - name: Dispatch b2b
+        if: |
+          (github.event_name == 'push' && steps.changes.outputs.b2b == 'true') ||
+          (github.event_name == 'workflow_dispatch' && (inputs.skill == 'b2b' || inputs.skill == 'both'))
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          gh api repos/commercetools-demo/skills-test-harness/dispatches \
+            -f event_type="b2b-${{ steps.suffix.outputs.value }}" \
+            -F client_payload[skills_repo_ref]="${{ github.ref_name }}" \
+            -F client_payload[skills_repo_sha]="${{ github.sha }}" \
+            -F client_payload[trigger_actor]="${{ github.actor }}"

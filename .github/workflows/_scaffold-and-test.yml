@@ -1,0 +1,192 @@
+name: Scaffold and test (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      skill_name:
+        required: true
+        type: string
+      skill_slug:
+        required: true
+        type: string
+      skills_repo_ref:
+        required: true
+        type: string
+      skills_repo_sha:
+        required: false
+        type: string
+        default: ''
+      publish:
+        required: true
+        type: boolean
+      deploy:
+        required: true
+        type: boolean
+    secrets:
+      CLAUDE_CODE_OAUTH_TOKEN:
+        required: true
+      HARNESS_APP_PRIVATE_KEY:
+        required: true
+      NETLIFY_AUTH_TOKEN:
+        required: false
+      SLACK_WEBHOOK_URL:
+        required: false
+      CTP_CLIENT_SECRET:
+        required: false
+      SESSION_SECRET:
+        required: false
+
+jobs:
+  scaffold-and-test:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.skill_slug }}
+    outputs:
+      score: ${{ steps.parse-judge.outputs.score }}
+      critical_count: ${{ steps.parse-judge.outputs.critical_count }}
+      high_count: ${{ steps.parse-judge.outputs.high_count }}
+      medium_count: ${{ steps.parse-judge.outputs.medium_count }}
+      preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
+
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.HARNESS_APP_ID }}
+          private-key: ${{ secrets.HARNESS_APP_PRIVATE_KEY }}
+          owner: commercetools-demo
+
+      - name: Create in-progress check run on skills commit
+        id: check
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node scripts/create-check-run.mjs \
+            --sha "${{ inputs.skills_repo_sha }}" \
+            --name "Harness: ${{ inputs.skill_slug }} ${{ inputs.publish && 'publish' || 'validate' }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+      - name: Checkout skill from skills repo
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          EXTRA_ARGS=""
+          if [ -n "${{ inputs.skills_repo_sha }}" ]; then
+            EXTRA_ARGS="--sha ${{ inputs.skills_repo_sha }}"
+          fi
+          node scripts/checkout-skill.mjs \
+            --skill-name "${{ inputs.skill_name }}" \
+            --ref "${{ inputs.skills_repo_ref }}" \
+            $EXTRA_ARGS
+
+      - name: Scaffold storefront with Claude Code
+        uses: anthropics/claude-code-action@beta
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt_file: prompts/scaffold-${{ inputs.skill_slug }}.md
+          claude_args: --max-turns 200
+
+      - name: Verify output exists
+        run: |
+          if [ ! -f output/package.json ]; then
+            echo "::error::Scaffold did not produce output/package.json"
+            exit 1
+          fi
+          echo "Output verified: $(ls output | wc -l) items at root"
+
+      - name: Run static checks (warnings only)
+        id: static-checks
+        run: |
+          bash tests/static-checks-${{ inputs.skill_slug }}.sh ./output/ | tee static-check-results.txt || true
+          echo "Static checks complete (warnings only, not blocking)"
+
+      - name: Grade output with Claude Code (judge)
+        uses: anthropics/claude-code-action@beta
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt_file: prompts/judge-${{ inputs.skill_slug }}.md
+
+      - name: Parse judge output
+        id: parse-judge
+        run: node scripts/parse-judge-output.mjs
+
+      - name: Deploy to Netlify
+        id: netlify-deploy
+        if: inputs.deploy == true
+        run: node scripts/setup-netlify-site.mjs
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+          CTP_AUTH_URL: ${{ vars.CTP_AUTH_URL }}
+          CTP_API_URL: ${{ vars.CTP_API_URL }}
+          CTP_PROJECT_KEY: ${{ vars.CTP_PROJECT_KEY }}
+          CTP_CLIENT_ID: ${{ vars.CTP_CLIENT_ID }}
+          CTP_CLIENT_SECRET: ${{ secrets.CTP_CLIENT_SECRET }}
+          CTP_SCOPES: ${{ vars.CTP_SCOPES }}
+          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
+
+      - name: Wait for Netlify deploy
+        id: wait-deploy
+        if: inputs.deploy == true
+        run: node scripts/wait-for-netlify-deploy.mjs
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+
+      - name: Run Playwright E2E tests
+        if: inputs.deploy == true
+        run: |
+          cd tests/playwright
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test ${{ inputs.skill_slug }}/
+        env:
+          BASE_URL: ${{ steps.wait-deploy.outputs.preview_url }}
+
+      - name: Publish to skills-scaffold
+        if: inputs.publish == true
+        run: node scripts/push-to-generated-repo.mjs
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+          HARNESS_SHA: ${{ github.sha }}
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-${{ inputs.skill_slug }}-${{ github.sha }}
+          path: |
+            judge-result.json
+            static-check-results.txt
+            tests/playwright/playwright-report/
+          if-no-files-found: ignore
+
+      - name: Update check run with result
+        if: always()
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          node scripts/update-check-run.mjs \
+            --check-run-id "${{ steps.check.outputs.check_run_id }}" \
+            --status "${{ job.status }}" \
+            --skill-slug "${{ inputs.skill_slug }}" \
+            --judge-output judge-result.json \
+            --preview-url "${{ steps.wait-deploy.outputs.preview_url }}" \
+            --published-branch "${{ inputs.publish && format('{0}/main', inputs.skill_slug) || '' }}"
+
+      - name: Post Slack notification
+        if: always()
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          node scripts/post-slack-notification.mjs \
+            --skill-slug "${{ inputs.skill_slug }}" \
+            --skill-name "${{ inputs.skill_name }}" \
+            --preview-url "${{ steps.wait-deploy.outputs.preview_url }}" \
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --status "${{ job.status }}" \
+            --skills-ref "${{ inputs.skills_repo_ref }}"
