@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { mkdtempSync, rmSync, cpSync, copyFileSync, existsSync } from 'fs';
+import { mkdtempSync, rmSync, cpSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
@@ -81,15 +81,6 @@ try {
   cpSync(skillSrcDir, destDir, { recursive: true });
 
   console.log(`Checked out ${skillName}@${ref} into .claude/skills/${skillName}/`);
-
-  // Copy HARNESS.md if present (per-run test instructions from the skills branch)
-  const harnessSrc = join(tmpDir, 'skills', skillName, 'HARNESS.md');
-  if (existsSync(harnessSrc)) {
-    copyFileSync(harnessSrc, '.harness-instructions.md');
-    console.log('Copied HARNESS.md → .harness-instructions.md');
-  } else {
-    console.log('No HARNESS.md found — skipping harness instructions');
-  }
 } catch (err) {
   if (err.message) console.error('ERROR:', err.message);
   cleanup();

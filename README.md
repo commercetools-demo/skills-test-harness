@@ -105,16 +105,27 @@ Create two environments in this repo — `b2c` and `b2b` — and add the followi
 
 Copy `docs/skills-repo/dispatch-harness.yml` into `.github/workflows/` of `commercetools-demo/skills`. This workflow detects changed skills on push and fires the appropriate `repository_dispatch` event (`b2c-validate`, `b2c-publish`, etc.) to this harness repo.
 
-## HARNESS.md — per-run instructions
+## Per-run instructions via commit message
 
-You can place a `HARNESS.md` file inside any skill directory in `commercetools-demo/skills` (e.g. `skills/commercetools-b2c-storefront/HARNESS.md`) to inject additional instructions into a specific harness run.
+You can inject additional instructions into a harness run by adding a `[harness]` block to the commit message in `commercetools-demo/skills`:
 
-When the harness checks out a skill it looks for `HARNESS.md` and, if present, copies it as `.harness-instructions.md` and appends its content to the scaffold prompt under an `## Additional test instructions` heading.
+```
+Add new promotions reference
+
+This adds promotions docs to the B2C skill.
+
+[harness]
+Also implement the promotions feature described in references/promotions.md.
+Verify that discount codes are applied correctly at checkout.
+[/harness]
+```
+
+The dispatch workflow extracts the content between `[harness]` and `[/harness]` and passes it as `extra_instructions` to the harness. Claude Code sees it appended to the base scaffold prompt under an `## Additional test instructions` heading.
 
 **Use cases:**
 
-- Testing a new optional feature before it merges to `main`: _"Also implement the promotions feature described in `references/promotions.md`"_
+- Testing a new optional feature before it graduates to the base prompt: _"Also implement the promotions feature described in `references/promotions.md`"_
 - Verifying a specific bug fix: _"Ensure cart versioning fix is applied — never use a stale version number"_
 - Narrowing scope for a branch run: _"Skip the dashboard phase and focus only on the quotes module"_
 
-The file is freeform Markdown. Keep instructions concrete and unambiguous — Claude Code sees this as extra context on top of the base scaffold prompt.
+You can also add instructions manually when triggering `workflow_dispatch` — the `extra_instructions` input on the validate workflows accepts the same freeform text.

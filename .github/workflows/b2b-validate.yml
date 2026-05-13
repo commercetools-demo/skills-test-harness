@@ -12,6 +12,10 @@ on:
       skills_repo_sha:
         description: 'Commit SHA (optional — for check run attachment)'
         required: false
+      extra_instructions:
+        description: 'Additional instructions for Claude (same as [harness] block in commit message)'
+        required: false
+        default: ''
 
 concurrency:
   group: b2b-validate-${{ github.event.client_payload.skills_repo_ref || inputs.skills_repo_ref }}
@@ -25,6 +29,7 @@ jobs:
       skill_slug: b2b
       skills_repo_ref: ${{ github.event.client_payload.skills_repo_ref || inputs.skills_repo_ref }}
       skills_repo_sha: ${{ github.event.client_payload.skills_repo_sha || inputs.skills_repo_sha || '' }}
+      extra_instructions: ${{ github.event.client_payload.extra_instructions || inputs.extra_instructions || '' }}
       publish: false
       deploy: true
     secrets: inherit

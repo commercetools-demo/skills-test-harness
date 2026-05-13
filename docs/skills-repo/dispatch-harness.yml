@@ -54,6 +54,23 @@ jobs:
           owner: commercetools-demo
           repositories: skills-test-harness
 
+      - name: Extract harness instructions from commit message
+        id: harness-block
+        run: |
+          # Extract content between [harness] and [/harness] markers in the commit message.
+          # Usage in a commit message:
+          #
+          #   Add new promotions reference
+          #
+          #   [harness]
+          #   Also implement the promotions feature described in references/promotions.md
+          #   [/harness]
+          COMMIT_BODY=$(git log -1 --format='%B')
+          EXTRA=$(printf '%s' "$COMMIT_BODY" | awk '/^\[harness\]/{found=1; next} /^\[\/harness\]/{found=0} found{print}')
+          # Store safely — no heredoc needed since we write to a file
+          printf '%s' "$EXTRA" > .harness-extra.txt
+          echo "has_extra=$([ -s .harness-extra.txt ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
       - name: Dispatch b2c
         if: |
           (github.event_name == 'push' && steps.changes.outputs.b2c == 'true') ||
@@ -61,11 +78,17 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          EXTRA=$(cat .harness-extra.txt)
+          PAYLOAD=$(jq -n \
+            --arg ref "${{ github.ref_name }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg extra "$EXTRA" \
+            '{skills_repo_ref:$ref,skills_repo_sha:$sha,trigger_actor:$actor,extra_instructions:$extra}')
           gh api repos/commercetools-demo/skills-test-harness/dispatches \
-            -f event_type="b2c-${{ steps.suffix.outputs.value }}" \
-            -F client_payload[skills_repo_ref]="${{ github.ref_name }}" \
-            -F client_payload[skills_repo_sha]="${{ github.sha }}" \
-            -F client_payload[trigger_actor]="${{ github.actor }}"
+            --input - <<EOF
+          {"event_type":"b2c-${{ steps.suffix.outputs.value }}","client_payload":$PAYLOAD}
+          EOF
 
       - name: Dispatch b2b
         if: |
@@ -74,8 +97,14 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
+          EXTRA=$(cat .harness-extra.txt)
+          PAYLOAD=$(jq -n \
+            --arg ref "${{ github.ref_name }}" \
+            --arg sha "${{ github.sha }}" \
+            --arg actor "${{ github.actor }}" \
+            --arg extra "$EXTRA" \
+            '{skills_repo_ref:$ref,skills_repo_sha:$sha,trigger_actor:$actor,extra_instructions:$extra}')
           gh api repos/commercetools-demo/skills-test-harness/dispatches \
-            -f event_type="b2b-${{ steps.suffix.outputs.value }}" \
-            -F client_payload[skills_repo_ref]="${{ github.ref_name }}" \
-            -F client_payload[skills_repo_sha]="${{ github.sha }}" \
-            -F client_payload[trigger_actor]="${{ github.actor }}"
+            --input - <<EOF
+          {"event_type":"b2b-${{ steps.suffix.outputs.value }}","client_payload":$PAYLOAD}
+          EOF

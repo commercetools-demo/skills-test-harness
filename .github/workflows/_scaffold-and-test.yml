@@ -22,6 +22,10 @@ on:
       deploy:
         required: true
         type: boolean
+      extra_instructions:
+        required: false
+        type: string
+        default: ''
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
@@ -85,27 +89,20 @@ jobs:
             --ref "${{ inputs.skills_repo_ref }}" \
             $EXTRA_ARGS
 
-      - name: Read scaffold prompt
-        id: scaffold-prompt
+      - name: Build scaffold prompt
+        env:
+          EXTRA_INSTRUCTIONS: ${{ inputs.extra_instructions }}
         run: |
-          DELIM="__SCAFFOLD_PROMPT_$(openssl rand -hex 8)__"
-          {
-            echo "content<<${DELIM}"
-            cat "prompts/scaffold-${{ inputs.skill_slug }}.md"
-            if [ -f ".harness-instructions.md" ]; then
-              echo ""
-              echo "## Additional test instructions"
-              echo ""
-              cat ".harness-instructions.md"
-            fi
-            echo "${DELIM}"
-          } >> "$GITHUB_OUTPUT"
+          cat "prompts/scaffold-${{ inputs.skill_slug }}.md" > scaffold-prompt.txt
+          if [ -n "$EXTRA_INSTRUCTIONS" ]; then
+            printf '\n## Additional test instructions\n\n%s\n' "$EXTRA_INSTRUCTIONS" >> scaffold-prompt.txt
+          fi
 
       - name: Scaffold storefront with Claude Code
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: ${{ steps.scaffold-prompt.outputs.content }}
+          prompt_file: scaffold-prompt.txt
           claude_args: --max-turns 200 --dangerously-skip-permissions
           mode: agent
           allowed_bots: '*'
@@ -132,21 +129,11 @@ jobs:
           bash tests/static-checks-${{ inputs.skill_slug }}.sh ./output/ | tee static-check-results.txt || true
           echo "Static checks complete (warnings only, not blocking)"
 
-      - name: Read judge prompt
-        id: judge-prompt
-        run: |
-          DELIM="__JUDGE_PROMPT_$(openssl rand -hex 8)__"
-          {
-            echo "content<<${DELIM}"
-            cat "prompts/judge-${{ inputs.skill_slug }}.md"
-            echo "${DELIM}"
-          } >> "$GITHUB_OUTPUT"
-
       - name: Grade output with Claude Code (judge)
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt: ${{ steps.judge-prompt.outputs.content }}
+          prompt_file: prompts/judge-${{ inputs.skill_slug }}.md
           mode: agent
           allowed_bots: '*'
 
