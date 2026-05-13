@@ -40,6 +40,9 @@ jobs:
   scaffold-and-test:
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
+    permissions:
+      id-token: write
+      contents: write
     outputs:
       score: ${{ steps.parse-judge.outputs.score }}
       critical_count: ${{ steps.parse-judge.outputs.critical_count }}
