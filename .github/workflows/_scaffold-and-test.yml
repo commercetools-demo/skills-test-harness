@@ -91,6 +91,12 @@ jobs:
           {
             echo 'content<<PROMPT_EOF'
             cat "prompts/scaffold-${{ inputs.skill_slug }}.md"
+            if [ -f ".harness-instructions.md" ]; then
+              echo ""
+              echo "## Additional test instructions"
+              echo ""
+              cat ".harness-instructions.md"
+            fi
             echo 'PROMPT_EOF'
           } >> "$GITHUB_OUTPUT"
 

@@ -1,7 +1,48 @@
 import { execSync } from 'child_process';
-import { mkdtempSync, rmSync, readdirSync, cpSync } from 'fs';
+import { mkdtempSync, rmSync, readdirSync, cpSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
+
+const IGNORED_DIRS = new Set([
+  'node_modules', '.next', '.turbo', '.cache', 'out', 'dist', 'build',
+  '.vercel', '.netlify', '.svelte-kit', '.nuxt',
+]);
+
+const DEFAULT_GITIGNORE = `# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+
+# build outputs
+dist/
+build/
+
+# env files
+.env
+.env.local
+.env.*.local
+
+# misc
+.turbo/
+.vercel/
+.netlify/
+*.log
+`;
+
+function removeIgnoredDirs(dir) {
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) continue;
+    const full = join(dir, entry.name);
+    if (IGNORED_DIRS.has(entry.name)) {
+      rmSync(full, { recursive: true, force: true });
+      console.log(`  removed ${full.replace(dir, '.')}`);
+    } else {
+      removeIgnoredDirs(full);
+    }
+  }
+}
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const SKILL_SLUG = process.env.SKILL_SLUG;
@@ -74,6 +115,17 @@ try {
   // 4. Copy ./output/* into the worktree
   console.log('Copying ./output/* into worktree...');
   cpSync('./output', tmpDir, { recursive: true });
+
+  // 4b. Remove large/generated directories before committing
+  console.log('Removing ignored directories...');
+  removeIgnoredDirs(tmpDir);
+
+  // 4c. Ensure .gitignore exists
+  const gitignorePath = join(tmpDir, '.gitignore');
+  if (!existsSync(gitignorePath)) {
+    writeFileSync(gitignorePath, DEFAULT_GITIGNORE);
+    console.log('Added default .gitignore');
+  }
 
   // 5. Commit and push
   run(`git -C "${tmpDir}" config user.email "ci-harness@commercetools.com"`);
