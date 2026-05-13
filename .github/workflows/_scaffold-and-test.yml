@@ -85,11 +85,20 @@ jobs:
             --ref "${{ inputs.skills_repo_ref }}" \
             $EXTRA_ARGS
 
+      - name: Read scaffold prompt
+        id: scaffold-prompt
+        run: |
+          {
+            echo 'content<<PROMPT_EOF'
+            cat "prompts/scaffold-${{ inputs.skill_slug }}.md"
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Scaffold storefront with Claude Code
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt_file: ${{ github.workspace }}/prompts/scaffold-${{ inputs.skill_slug }}.md
+          prompt: ${{ steps.scaffold-prompt.outputs.content }}
           claude_args: --max-turns 200
           mode: agent
 
@@ -107,11 +116,20 @@ jobs:
           bash tests/static-checks-${{ inputs.skill_slug }}.sh ./output/ | tee static-check-results.txt || true
           echo "Static checks complete (warnings only, not blocking)"
 
+      - name: Read judge prompt
+        id: judge-prompt
+        run: |
+          {
+            echo 'content<<PROMPT_EOF'
+            cat "prompts/judge-${{ inputs.skill_slug }}.md"
+            echo 'PROMPT_EOF'
+          } >> "$GITHUB_OUTPUT"
+
       - name: Grade output with Claude Code (judge)
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt_file: ${{ github.workspace }}/prompts/judge-${{ inputs.skill_slug }}.md
+          prompt: ${{ steps.judge-prompt.outputs.content }}
           mode: agent
 
       - name: Parse judge output
