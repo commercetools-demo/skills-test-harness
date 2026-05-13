@@ -90,6 +90,7 @@ jobs:
             $EXTRA_ARGS
 
       - name: Build scaffold prompt
+        id: scaffold-prompt
         env:
           EXTRA_INSTRUCTIONS: ${{ inputs.extra_instructions }}
         run: |
@@ -97,12 +98,20 @@ jobs:
           if [ -n "$EXTRA_INSTRUCTIONS" ]; then
             printf '\n## Additional test instructions\n\n%s\n' "$EXTRA_INSTRUCTIONS" >> scaffold-prompt.txt
           fi
+          python3 - <<'PYEOF'
+          import os, secrets
+          content = open('scaffold-prompt.txt').read()
+          delim = 'SCAFFOLD_' + secrets.token_hex(16)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'content<<{delim}\n{content}\n{delim}\n')
+          print(f'Prompt ready ({len(content)} chars)')
+          PYEOF
 
       - name: Scaffold storefront with Claude Code
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt_file: scaffold-prompt.txt
+          prompt: ${{ steps.scaffold-prompt.outputs.content }}
           claude_args: --max-turns 200 --dangerously-skip-permissions
           mode: agent
           allowed_bots: '*'
@@ -129,11 +138,23 @@ jobs:
           bash tests/static-checks-${{ inputs.skill_slug }}.sh ./output/ | tee static-check-results.txt || true
           echo "Static checks complete (warnings only, not blocking)"
 
+      - name: Build judge prompt
+        id: judge-prompt
+        run: |
+          python3 - <<'PYEOF'
+          import os, secrets
+          content = open(f'prompts/judge-${{ inputs.skill_slug }}.md').read()
+          delim = 'JUDGE_' + secrets.token_hex(16)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'content<<{delim}\n{content}\n{delim}\n')
+          print(f'Judge prompt ready ({len(content)} chars)')
+          PYEOF
+
       - name: Grade output with Claude Code (judge)
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          prompt_file: prompts/judge-${{ inputs.skill_slug }}.md
+          prompt: ${{ steps.judge-prompt.outputs.content }}
           mode: agent
           allowed_bots: '*'
 
