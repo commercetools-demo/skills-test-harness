@@ -22,6 +22,7 @@ jobs:
       skill_slug: b2b
       skills_repo_ref: ${{ github.event.client_payload.skills_repo_ref || inputs.skills_repo_ref }}
       skills_repo_sha: ${{ github.event.client_payload.skills_repo_sha || '' }}
+      extra_instructions: ${{ github.event.client_payload.extra_instructions || '' }}
       source_repo: commercetools-demo/commercetools-plugin
       publish: true
       deploy: false
