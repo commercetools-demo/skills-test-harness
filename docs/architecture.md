@@ -149,9 +149,9 @@ b2c-publish.yml / b2b-publish.yml
 
 ## Why two repos?
 
-**Separation of concerns.** Skill authors edit `commercetools-demo/skills` with their own PR review process. Harness authors tune prompts, workflows, and tests in `skills-test-harness`. These are different change frequencies and different reviewers.
+**Separation of concerns.** Skill authors edit `commercetools-demo/commercetools-plugin` with their own PR review process. Harness authors tune prompts, workflows, and tests in `skills-test-harness`. These are different change frequencies and different reviewers.
 
-**Clean CI signal.** A check run appears directly on the skills commit, where the changing code lives. The developer sees pass/fail alongside their other CI checks — they don't need to navigate to a separate repo.
+**Clean CI signal.** A check run appears directly on the plugin commit, where the changing code lives. The developer sees pass/fail alongside their other CI checks — they don't need to navigate to a separate repo.
 
 **Harness changes don't pollute skill history.** Prompt iteration or test tuning in the harness doesn't add noise to the skills repo's git log.
 

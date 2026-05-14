@@ -4,15 +4,15 @@ This guide covers the one-time external setup required before the CI harness can
 
 ---
 
-## Part 1 — Setup on the `skills` repo
+## Part 1 — Setup on the plugin repo
 
-### 1.1 Install the GitHub App on the skills repo
+### 1.1 Install the GitHub App on the plugin repo
 
-If the App was installed org-wide in Part 0, this is already done. Confirm the App has access to `commercetools-demo/skills`.
+If the App was installed org-wide in Part 0, this is already done. Confirm the App has access to `commercetools-demo/commercetools-plugin`.
 
-### 1.2 Add secrets to the `skills` repo
+### 1.2 Add secrets to the plugin repo
 
-In `commercetools-demo/skills` → Settings → Secrets → Actions, add:
+In `commercetools-demo/commercetools-plugin` → Settings → Secrets → Actions, add:
 
 | Secret | Value |
 |---|---|
@@ -21,7 +21,7 @@ In `commercetools-demo/skills` → Settings → Secrets → Actions, add:
 
 ### 1.3 Copy the dispatch workflow
 
-Copy `docs/skills-repo/dispatch-harness.yml` from the harness repo into the skills repo at `.github/workflows/dispatch-harness.yml`. Commit and push to a test branch.
+Copy `docs/plugin-repo/dispatch-harness.yml` from the harness repo into the plugin repo at `.github/workflows/dispatch-harness.yml`. Commit and push to a test branch.
 
 ### 1.4 Verify end-to-end
 
@@ -53,7 +53,7 @@ The harness uses a GitHub App (not a PAT) for cross-repo operations so that perm
 1. Go to `https://github.com/organizations/commercetools-demo/settings/apps/new`
 2. Fill in:
    - **GitHub App name:** `skills-harness-bot`
-   - **Homepage URL:** `https://github.com/commercetools-demo/skills-test-harness`
+   - **Homepage URL:** `https://github.com/commercetools-demo/commercetools-plugin-test-harness`
    - **Webhook:** Uncheck "Active" (the harness does not receive webhooks)
 3. Set **Repository permissions:**
    - `Administration`: Read & write (needed to create branches on `skills-scaffold`)
@@ -177,7 +177,7 @@ The harness uses **GitHub Environments** (`b2c` and `b2b`) so that each job gets
 
 ### Repository-level secrets
 
-Go to `https://github.com/commercetools-demo/skills-test-harness/settings/secrets/actions`:
+Go to `https://github.com/commercetools-demo/commercetools-plugin-test-harness/settings/secrets/actions`:
 
 | Secret | Value | Purpose |
 |---|---|---|
@@ -187,7 +187,7 @@ Go to `https://github.com/commercetools-demo/skills-test-harness/settings/secret
 
 ### Repository-level variables
 
-Go to `https://github.com/commercetools-demo/skills-test-harness/settings/variables/actions`:
+Go to `https://github.com/commercetools-demo/commercetools-plugin-test-harness/settings/variables/actions`:
 
 | Variable | Value | Purpose |
 |---|---|---|
@@ -197,7 +197,7 @@ Go to `https://github.com/commercetools-demo/skills-test-harness/settings/variab
 
 ### Environments
 
-Go to `https://github.com/commercetools-demo/skills-test-harness/settings/environments` and create two environments: **`b2c`** and **`b2b`**.
+Go to `https://github.com/commercetools-demo/commercetools-plugin-test-harness/settings/environments` and create two environments: **`b2c`** and **`b2b`**.
 
 For each environment, set these **secrets** and **variables** with the corresponding skill's values:
 
@@ -227,13 +227,13 @@ Work through this list top-to-bottom before triggering any workflow.
 - [ ] GitHub App installed on `skills`, `skills-test-harness`, and `skills-scaffold`
 - [ ] App ID noted → added as repo variable `HARNESS_APP_ID`
 - [ ] Private key `.pem` downloaded → added as repo secret `HARNESS_APP_PRIVATE_KEY`
-- [ ] `commercetools-demo/skills-scaffold` repo created (private, with README)
+- [ ] `commercetools-demo/commercetools-plugin-scaffold` repo created (private, with README)
 - [ ] Claude OAuth token generated → added as repo secret `CLAUDE_CODE_OAUTH_TOKEN`
 - [ ] Netlify PAT generated → added as repo secret `NETLIFY_AUTH_TOKEN`
 - [ ] `CTP_AUTH_URL` and `CTP_API_URL` added as repo variables
 - [ ] B2C CT API client created → `CTP_CLIENT_SECRET` + `SESSION_SECRET` in `b2c` env secrets; `CTP_PROJECT_KEY` + `CTP_CLIENT_ID` + `CTP_SCOPES` in `b2c` env variables
 - [ ] B2B CT API client created → same pattern in `b2b` environment
-- [ ] `dispatch-harness.yml` copied to `commercetools-demo/skills`, `HARNESS_APP_ID` + `HARNESS_APP_PRIVATE_KEY` secrets added there
+- [ ] `dispatch-harness.yml` copied to `commercetools-demo/commercetools-plugin` at `.github/workflows/`, `HARNESS_APP_ID` + `HARNESS_APP_PRIVATE_KEY` secrets added there
 - [ ] Manually trigger `b2c-validate` via `workflow_dispatch` from harness → verify run completes
 - [ ] Confirm `static-check-results.txt` and `judge-result.json` appear as workflow artifacts
 - [ ] Manually trigger `b2b-validate` to validate B2B pipeline

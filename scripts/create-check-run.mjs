@@ -10,7 +10,7 @@ function getArg(name) {
 const sha = getArg('--sha');
 const name = getArg('--name');
 const runUrl = getArg('--run-url');
-const repo = getArg('--repo') ?? 'commercetools-demo/skills';
+const repo = getArg('--repo') ?? 'commercetools-demo/commercetools-plugin';
 
 const GITHUB_OUTPUT = process.env.GITHUB_OUTPUT;
 

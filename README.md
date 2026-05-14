@@ -2,16 +2,16 @@
 
 > NOTE: This is NOT official commercetools code and NOT production ready. Use at your own risk.
 
-A CI harness that validates [commercetools Claude Code skills](https://github.com/commercetools-demo/skills) by autonomously generating full storefronts and scoring the output.
+A CI harness that validates [commercetools Claude Code plugins](https://github.com/commercetools-demo/commercetools-plugin) by autonomously generating full storefronts and scoring the output.
 
-On every push to `commercetools-demo/skills`, the harness:
+On every push to `commercetools-demo/commercetools-plugin`, the harness:
 
-1. Checks out the updated skill from the skills repo
+1. Checks out the plugin repo and installs it as a local marketplace
 2. Runs Claude Code (agent mode) to scaffold a complete Next.js storefront under `./output/`
 3. Runs static checks (warn-only) and a judge LLM pass to score the output (0–100)
 4. Optionally deploys to Netlify and runs Playwright E2E tests
 5. Pushes the generated code to [`commercetools-demo/skills-scaffold`](https://github.com/commercetools-demo/skills-scaffold)
-6. Reports results as a GitHub check run on the originating commit in the skills repo
+6. Reports results as a GitHub check run on the originating commit in the plugin repo
 7. Notifies a Slack channel with the score and preview URL
 
 ## Repository layout
@@ -25,16 +25,16 @@ On every push to `commercetools-demo/skills`, the harness:
     b2b-validate.yml
     b2b-publish.yml
 docs/
-  skills-repo/
-    dispatch-harness.yml     # reference workflow to copy into commercetools-demo/skills
+  plugin-repo/
+    dispatch-harness.yml     # reference workflow to copy into commercetools-demo/commercetools-plugin
 prompts/
   scaffold-b2c.md            # scaffold prompt for the B2C skill
   scaffold-b2b.md            # scaffold prompt for the B2B skill
   judge-b2c.md               # judge prompt for B2C scoring
   judge-b2b.md               # judge prompt for B2B scoring
 scripts/
-  checkout-skill.mjs         # clones the skills repo and copies the skill locally
-  create-check-run.mjs       # creates an in-progress check run on the skills commit
+  checkout-skill.mjs         # clones the plugin repo into ./plugin-source/
+  create-check-run.mjs       # creates an in-progress check run on the plugin commit
   update-check-run.mjs       # marks the check run completed with score + links
   parse-judge-output.mjs     # extracts score and violation counts from judge-result.json
   push-to-generated-repo.mjs # pushes ./output to skills-scaffold (strips node_modules etc.)
@@ -53,8 +53,8 @@ tests/
 
 | Mode | Trigger | Netlify deploy | Target branch in skills-scaffold |
 |------|---------|----------------|----------------------------------|
-| **validate** | Push to any branch in skills repo | yes | `<skill>/preview/<branch-name>` |
-| **publish** | Push to `main` in skills repo | no | `<skill>/main` |
+| **validate** | Push to any branch in plugin repo | yes | `<skill>/preview/<branch-name>` |
+| **publish** | Push to `main` in plugin repo | no | `<skill>/main` |
 
 ### Scoring
 
@@ -64,14 +64,14 @@ The judge prompt reads the generated output and writes `judge-result.json` with 
 - `-10` per high violation
 - `-5` per medium violation
 
-The score and top violations are reported as a GitHub check run summary on the originating skills commit.
+The score and top violations are reported as a GitHub check run summary on the originating plugin commit.
 
 ## Setup
 
 ### GitHub App
 
 Create a GitHub App (`HARNESS_APP_ID`) with:
-- **Read & write** access to: Checks, Contents on `commercetools-demo/skills`
+- **Read & write** access to: Checks, Contents on `commercetools-demo/commercetools-plugin`
 - **Read & write** access to: Contents on `commercetools-demo/skills-scaffold`
 
 Install it on both repositories. Store the private key as `HARNESS_APP_PRIVATE_KEY` in the harness repo secrets.
@@ -101,13 +101,13 @@ Create two environments in this repo — `b2c` and `b2b` — and add the followi
 | `CTP_CLIENT_ID` | commercetools API client ID |
 | `CTP_SCOPES` | space-separated scopes |
 
-### skills repo — dispatch workflow
+### Plugin repo — dispatch workflow
 
-Copy `docs/skills-repo/dispatch-harness.yml` into `.github/workflows/` of `commercetools-demo/skills`. This workflow detects changed skills on push and fires the appropriate `repository_dispatch` event (`b2c-validate`, `b2c-publish`, etc.) to this harness repo.
+Copy `docs/plugin-repo/dispatch-harness.yml` into `.github/workflows/` of `commercetools-demo/commercetools-plugin`. This workflow detects changed skills on push and fires the appropriate `repository_dispatch` event (`b2c-validate`, `b2c-publish`, etc.) to this harness repo.
 
 ## Per-run instructions via commit message
 
-You can inject additional instructions into a harness run by adding a `[harness]` block to the commit message in `commercetools-demo/skills`:
+You can inject additional instructions into a harness run by adding a `[harness]` block to the commit message in `commercetools-demo/commercetools-plugin`:
 
 ```
 Add new promotions reference

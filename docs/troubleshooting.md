@@ -185,12 +185,12 @@ You can inspect the raw Claude output by looking at the workflow step logs — t
 4. Verify the App has `Contents: write` and `Metadata: read` on the harness repo (needed for dispatch)
 
 ### Harness ran but no check run appeared on the skills commit
-1. Verify the GitHub App has `Checks: write` permission on `commercetools-demo/skills`
+1. Verify the GitHub App has `Checks: write` permission on `commercetools-demo/commercetools-plugin`
 2. Confirm `skills_repo_sha` was included in the dispatch payload (`client_payload.skills_repo_sha`)
 3. Look at the "Create in-progress check run" step in the harness run logs for errors
 
 ### Check run stuck "in_progress"
-The `update-check-run.mjs` step runs with `if: always()`. If the check is stuck, look at the harness run — the update step itself failed (likely a GH_TOKEN permission issue). Check the App has `Checks: write` on the skills repo.
+The `update-check-run.mjs` step runs with `if: always()`. If the check is stuck, look at the harness run — the update step itself failed (likely a GH_TOKEN permission issue). Check the App has `Checks: write` on `commercetools-demo/commercetools-plugin`.
 
 ### Two pushes both completed instead of the second cancelling the first
 The concurrency key must be the skills repo branch, not the harness `github.ref`. Verify `b2c-validate.yml` has:

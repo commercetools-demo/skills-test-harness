@@ -6,8 +6,7 @@ name: Dispatch to test harness
 on:
   push:
     paths:
-      - 'plugins/commercetools-demo/skills/commercetools-b2c-storefront/**'
-      - 'plugins/commercetools-demo/skills/commercetools-b2b-storefront/**'
+      - 'plugins/commercetools-demo/**'
       - '.github/workflows/dispatch-harness.yml'
   workflow_dispatch:
     inputs:

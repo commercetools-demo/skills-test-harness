@@ -10,7 +10,7 @@ function getArg(name) {
 const checkRunId = getArg('--check-run-id');
 const status = getArg('--status');
 const skillSlug = getArg('--skill-slug');
-const repo = getArg('--repo') ?? 'commercetools-demo/skills';
+const repo = getArg('--repo') ?? 'commercetools-demo/commercetools-plugin';
 const judgeOutputPath = getArg('--judge-output') ?? 'judge-result.json';
 const previewUrl = getArg('--preview-url');
 const publishedBranch = getArg('--published-branch');
