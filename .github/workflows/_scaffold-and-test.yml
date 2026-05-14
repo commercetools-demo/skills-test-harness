@@ -214,6 +214,7 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.judge-prompt.outputs.content }}
+          claude_args: --dangerously-skip-permissions
           allowed_bots: '*'
 
       - name: Parse judge output
