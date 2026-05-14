@@ -1,4 +1,4 @@
-name: B2C — Publish to generated-storefronts
+name: B2C — Publish from plugin repo to generated-storefronts
 
 on:
   repository_dispatch:
@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       skills_repo_ref:
-        description: 'Branch in commercetools-demo/skills (use main)'
+        description: 'Branch in commercetools-demo/commercetools-plugin (use main)'
         required: true
         default: 'main'
 
@@ -22,6 +22,7 @@ jobs:
       skill_slug: b2c
       skills_repo_ref: ${{ github.event.client_payload.skills_repo_ref || inputs.skills_repo_ref }}
       skills_repo_sha: ${{ github.event.client_payload.skills_repo_sha || '' }}
+      source_repo: commercetools-demo/commercetools-plugin
       publish: true
       deploy: false
     secrets: inherit

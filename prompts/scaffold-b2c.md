@@ -1,8 +1,6 @@
 This is an automated CI run. Do not ask any questions, request clarification, or wait for user input at any point. Make reasonable assumptions and proceed autonomously to completion.
 
-Read the skill file at `.claude/skills/commercetools-b2c-storefront/SKILL.md` in full.
-
-Using the knowledge from those files, generate a complete B2C storefront.
+Generate a complete B2C storefront.
 
 ## Output location
 

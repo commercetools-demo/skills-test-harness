@@ -26,6 +26,10 @@ on:
         required: false
         type: string
         default: ''
+      source_repo:
+        required: false
+        type: string
+        default: 'commercetools-demo/commercetools-plugin'
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
@@ -72,9 +76,10 @@ jobs:
           node scripts/create-check-run.mjs \
             --sha "${{ inputs.skills_repo_sha }}" \
             --name "Harness: ${{ inputs.skill_slug }} ${{ inputs.publish && 'publish' || 'validate' }}" \
-            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
+            --repo "${{ inputs.source_repo }}"
 
-      - name: Checkout skill from skills repo
+      - name: Checkout plugin repo
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
@@ -83,8 +88,8 @@ jobs:
             EXTRA_ARGS="--sha ${{ inputs.skills_repo_sha }}"
           fi
           node scripts/checkout-skill.mjs \
-            --skill-name "${{ inputs.skill_name }}" \
             --ref "${{ inputs.skills_repo_ref }}" \
+            --source-repo "${{ inputs.source_repo }}" \
             $EXTRA_ARGS
 
       - name: Build scaffold prompt
@@ -112,6 +117,8 @@ jobs:
           prompt: ${{ steps.scaffold-prompt.outputs.content }}
           claude_args: --max-turns 200 --dangerously-skip-permissions
           allowed_bots: '*'
+          plugin_marketplaces: ${{ github.workspace }}/plugin-source
+          plugins: commercetools-demo@commercetools-demo
 
       - name: Verify output exists
         id: verify-output
@@ -331,7 +338,8 @@ jobs:
             --skill-slug "${{ inputs.skill_slug }}" \
             --judge-output judge-result.json \
             --preview-url "${{ needs.deploy.outputs.preview_url }}" \
-            --published-branch "${{ inputs.publish && format('{0}/main', inputs.skill_slug) || '' }}"
+            --published-branch "${{ inputs.publish && format('{0}/main', inputs.skill_slug) || '' }}" \
+            --repo "${{ inputs.source_repo }}"
 
       - name: Post Slack notification
         env:
