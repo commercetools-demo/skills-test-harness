@@ -116,7 +116,7 @@ jobs:
       - name: Verify output exists
         id: verify-output
         run: |
-          PKG=$(find output -name package.json | head -1)
+          PKG=$(find output -name package.json -not -path '*/node_modules/*' | head -1)
           if [ -z "$PKG" ]; then
             echo "::error::Scaffold did not produce a package.json anywhere under ./output/"
             echo "Contents of output/:"
@@ -134,7 +134,22 @@ jobs:
           bash tests/static-checks-${{ inputs.skill_slug }}.sh ./output/ | tee static-check-results.txt || true
           echo "Static checks complete (warnings only, not blocking)"
 
+      - name: Push output to skills-scaffold (preview branch)
+        if: always() && inputs.publish == false
+        run: |
+          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
+            echo "output/ is empty — nothing to push"
+            exit 0
+          fi
+          node scripts/push-to-generated-repo.mjs
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+          HARNESS_SHA: ${{ github.sha }}
+          TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
+
       - name: Upload output artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
@@ -207,6 +222,8 @@ jobs:
           if-no-files-found: ignore
 
   # ── 2b. Deploy + Playwright (parallel with judge) ───────────────────────────
+  # The preview branch push already happened in `scaffold`, which triggers
+  # Netlify's git-linked auto-deploy. This job just waits for it and runs tests.
   deploy:
     needs: scaffold
     runs-on: ubuntu-latest
@@ -219,33 +236,13 @@ jobs:
       - name: Checkout harness
         uses: actions/checkout@v4
 
-      - name: Download output artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
-          path: output/
-
-      - name: Deploy to Netlify
-        id: netlify-deploy
-        run: node scripts/setup-netlify-site.mjs
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          SKILL_SLUG: ${{ inputs.skill_slug }}
-          APP_DIR: ${{ needs.scaffold.outputs.app_dir }}
-          CTP_AUTH_URL: ${{ vars.CTP_AUTH_URL }}
-          CTP_API_URL: ${{ vars.CTP_API_URL }}
-          CTP_PROJECT_KEY: ${{ vars.CTP_PROJECT_KEY }}
-          CTP_CLIENT_ID: ${{ vars.CTP_CLIENT_ID }}
-          CTP_CLIENT_SECRET: ${{ secrets.CTP_CLIENT_SECRET }}
-          CTP_SCOPES: ${{ vars.CTP_SCOPES }}
-          SESSION_SECRET: ${{ secrets.SESSION_SECRET }}
-
       - name: Wait for Netlify deploy
         id: wait-deploy
         run: node scripts/wait-for-netlify-deploy.mjs
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           SKILL_SLUG: ${{ inputs.skill_slug }}
+          TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
 
       - name: Run Playwright E2E tests
         run: |
@@ -310,20 +307,6 @@ jobs:
           else
             echo "value=failure" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Push output to skills-scaffold (preview branch)
-        if: inputs.publish == false
-        run: |
-          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
-            echo "output/ is empty — nothing to push"
-            exit 0
-          fi
-          node scripts/push-to-generated-repo.mjs
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          SKILL_SLUG: ${{ inputs.skill_slug }}
-          HARNESS_SHA: ${{ github.sha }}
-          TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
 
       - name: Publish to skills-scaffold (canonical branch)
         if: inputs.publish == true
