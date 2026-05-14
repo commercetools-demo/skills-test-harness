@@ -10,6 +10,7 @@ function getArg(name) {
 const sha = getArg('--sha');
 const name = getArg('--name');
 const runUrl = getArg('--run-url');
+const repo = getArg('--repo') ?? 'commercetools-demo/skills';
 
 const GITHUB_OUTPUT = process.env.GITHUB_OUTPUT;
 
@@ -27,7 +28,7 @@ if (!sha) {
 
 const GH_TOKEN = process.env.GH_TOKEN;
 if (!GH_TOKEN) {
-  console.error('ERROR: GH_TOKEN env var required. Ensure the GitHub App is installed on commercetools-demo/skills');
+  console.error(`ERROR: GH_TOKEN env var required. Ensure the GitHub App is installed on ${repo}`);
   process.exit(1);
 }
 
@@ -42,7 +43,7 @@ if (!runUrl) {
 
 try {
   const res = await fetch(
-    'https://api.github.com/repos/commercetools-demo/skills/check-runs',
+    `https://api.github.com/repos/${repo}/check-runs`,
     {
       method: 'POST',
       headers: {

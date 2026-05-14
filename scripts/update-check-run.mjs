@@ -10,6 +10,7 @@ function getArg(name) {
 const checkRunId = getArg('--check-run-id');
 const status = getArg('--status');
 const skillSlug = getArg('--skill-slug');
+const repo = getArg('--repo') ?? 'commercetools-demo/skills';
 const judgeOutputPath = getArg('--judge-output') ?? 'judge-result.json';
 const previewUrl = getArg('--preview-url');
 const publishedBranch = getArg('--published-branch');
@@ -21,7 +22,7 @@ if (!checkRunId) {
 
 const GH_TOKEN = process.env.GH_TOKEN;
 if (!GH_TOKEN) {
-  console.error('ERROR: GH_TOKEN env var required. Ensure the GitHub App is installed on commercetools-demo/skills');
+  console.error(`ERROR: GH_TOKEN env var required. Ensure the GitHub App is installed on ${repo}`);
   process.exit(1);
 }
 
@@ -94,7 +95,7 @@ const title = `Score: ${score}/100 — ${criticalCount} critical, ${highCount} h
 
 try {
   const res = await fetch(
-    `https://api.github.com/repos/commercetools-demo/skills/check-runs/${checkRunId}`,
+    `https://api.github.com/repos/${repo}/check-runs/${checkRunId}`,
     {
       method: 'PATCH',
       headers: {
