@@ -9,7 +9,7 @@ Generate a complete B2C storefront.
 3. product-listing
 4. product-detail
 5. cart
-6. checkout
+6. checkout (integrated with commercetools checkout)
 7. customer-auth
 8. search-facets
 9. performance
