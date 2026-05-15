@@ -140,7 +140,7 @@ try {
     process.exit(0);
   }
 
-  run(`git -C "${tmpDir}" push --force-with-lease origin "${BRANCH}"`);
+  run(`git -C "${tmpDir}" push --force origin "${BRANCH}"`);
   console.log(`Successfully pushed to ${BRANCH}`);
 } catch (err) {
   console.error('ERROR pushing to generated repo:', err.message ?? err);
