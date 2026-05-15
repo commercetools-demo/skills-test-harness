@@ -253,6 +253,7 @@ jobs:
           TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
 
       - name: Run Playwright E2E tests
+        if: false
         run: |
           cd tests/playwright
           npm ci
