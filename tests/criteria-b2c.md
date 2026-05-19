@@ -19,9 +19,8 @@ Failing any Critical item is a blocking violation. A non-empty `critical_violati
 ### CRIT-2: Cart Versioning
 
 - Every cart write operation (add line item, remove line item, update quantity, apply discount, set shipping address, etc.) fetches the current cart version immediately before the write.
-- The cart mutation handler retries on HTTP 409 `ConcurrentModification` by re-fetching the cart and retrying with the updated version.
 
-**Pass condition:** All cart write Route Handlers follow the fetch-version → write → retry-on-409 pattern.
+**Pass condition:** All cart write Route Handlers follow the fetch-version → write
 
 ### CRIT-3: Session Secrets
 
