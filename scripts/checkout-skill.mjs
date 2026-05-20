@@ -22,10 +22,9 @@ if (!GH_TOKEN) {
   process.exit(1);
 }
 
-const clonePath = 'local-marketplace/commercetools-demo';
+const clonePath = 'plugin-source';
 
 try {
-  execSync(`mkdir -p local-marketplace`, { stdio: 'inherit' });
   execSync(
     `git clone --depth 1 --branch "${ref}" "https://x-access-token:${GH_TOKEN}@github.com/${sourceRepo}.git" ${clonePath}`,
     { stdio: 'inherit' }
