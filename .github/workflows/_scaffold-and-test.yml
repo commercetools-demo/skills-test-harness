@@ -29,7 +29,7 @@ on:
       source_repo:
         required: false
         type: string
-        default: 'commercetools-demo/commercetools-plugin'
+        default: 'commercetools-demo/skills'
     secrets:
       CLAUDE_CODE_OAUTH_TOKEN:
         required: true
@@ -117,7 +117,7 @@ jobs:
           prompt: ${{ steps.scaffold-prompt.outputs.content }}
           claude_args: --max-turns 200 --dangerously-skip-permissions
           allowed_bots: '*'
-          plugin_marketplaces: ${{ github.workspace }}/plugin-source
+          plugin_marketplaces: ${{ github.workspace }}/local-marketplace
           plugins: commercetools-demo@commercetools-demo
 
       - name: Verify output exists

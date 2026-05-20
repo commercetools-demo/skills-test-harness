@@ -9,7 +9,7 @@ function getArg(name) {
 
 const ref = getArg('--ref');
 const sha = getArg('--sha');
-const sourceRepo = getArg('--source-repo') ?? 'commercetools-demo/commercetools-plugin';
+const sourceRepo = getArg('--source-repo') ?? 'commercetools-demo/skills';
 
 if (!ref) {
   console.error('ERROR: --ref is required');
@@ -22,15 +22,18 @@ if (!GH_TOKEN) {
   process.exit(1);
 }
 
+const clonePath = 'local-marketplace/commercetools-demo';
+
 try {
+  execSync(`mkdir -p local-marketplace`, { stdio: 'inherit' });
   execSync(
-    `git clone --depth 1 --branch "${ref}" "https://x-access-token:${GH_TOKEN}@github.com/${sourceRepo}.git" plugin-source`,
+    `git clone --depth 1 --branch "${ref}" "https://x-access-token:${GH_TOKEN}@github.com/${sourceRepo}.git" ${clonePath}`,
     { stdio: 'inherit' }
   );
 
   // Optional SHA verification
   if (sha) {
-    const actual = execSync('git -C plugin-source rev-parse HEAD', { stdio: 'pipe' })
+    const actual = execSync(`git -C ${clonePath} rev-parse HEAD`, { stdio: 'pipe' })
       .toString()
       .trim();
     if (actual !== sha) {
@@ -39,7 +42,7 @@ try {
     }
   }
 
-  console.log(`Checked out ${sourceRepo}@${ref} into ./plugin-source/`);
+  console.log(`Checked out ${sourceRepo}@${ref} into ./${clonePath}/`);
 } catch (err) {
   if (err.message) console.error('ERROR:', err.message);
   process.exit(1);

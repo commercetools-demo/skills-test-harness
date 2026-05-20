@@ -1,4 +1,4 @@
-# This file belongs in commercetools-demo/commercetools-plugin at .github/workflows/dispatch-harness.yml
+# This file belongs in commercetools-demo/skills at .github/workflows/dispatch-harness.yml
 # It dispatches the skills-test-harness to validate or publish whenever a skill changes.
 
 name: Dispatch to test harness
@@ -6,7 +6,8 @@ name: Dispatch to test harness
 on:
   push:
     paths:
-      - 'plugins/commercetools-demo/**'
+      - 'skills/commercetools-b2c-storefront/**'
+      - 'skills/commercetools-b2b-storefront/**'
       - '.github/workflows/dispatch-harness.yml'
   workflow_dispatch:
     inputs:
@@ -31,9 +32,9 @@ jobs:
         with:
           filters: |
             b2c:
-              - 'plugins/commercetools-demo/skills/commercetools-b2c-storefront/**'
+              - 'skills/commercetools-b2c-storefront/**'
             b2b:
-              - 'plugins/commercetools-demo/skills/commercetools-b2b-storefront/**'
+              - 'skills/commercetools-b2b-storefront/**'
 
       - name: Determine event suffix (validate vs publish)
         id: suffix
