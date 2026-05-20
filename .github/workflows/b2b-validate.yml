@@ -31,6 +31,5 @@ jobs:
       skills_repo_sha: ${{ github.event.client_payload.skills_repo_sha || inputs.skills_repo_sha || '' }}
       extra_instructions: ${{ github.event.client_payload.extra_instructions || inputs.extra_instructions || '' }}
       source_repo: commercetools-demo/skills
-      publish: true
       deploy: true
     secrets: inherit

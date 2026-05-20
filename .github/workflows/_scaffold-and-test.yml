@@ -16,9 +16,6 @@ on:
         required: false
         type: string
         default: ''
-      publish:
-        required: true
-        type: boolean
       deploy:
         required: true
         type: boolean
@@ -75,7 +72,7 @@ jobs:
         run: |
           node scripts/create-check-run.mjs \
             --sha "${{ inputs.skills_repo_sha }}" \
-            --name "Harness: ${{ inputs.skill_slug }} ${{ inputs.publish && 'publish' || 'validate' }}" \
+            --name "Harness: ${{ inputs.skill_slug }} ${{ inputs.skills_repo_ref == 'main' && 'publish' || 'validate' }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --repo "${{ inputs.source_repo }}"
 
@@ -142,7 +139,7 @@ jobs:
           echo "Static checks complete (warnings only, not blocking)"
 
       - name: Push output to skills-scaffold (preview branch)
-        if: always() && inputs.publish == false
+        if: always()
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -318,7 +315,7 @@ jobs:
           fi
 
       - name: Publish to skills-scaffold (canonical branch)
-        if: inputs.publish == true
+        if: inputs.skills_repo_ref == 'main'
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -340,7 +337,7 @@ jobs:
             --skill-slug "${{ inputs.skill_slug }}" \
             --judge-output judge-result.json \
             --preview-url "${{ needs.deploy.outputs.preview_url }}" \
-            --published-branch "${{ inputs.publish && format('{0}/main', inputs.skill_slug) || '' }}" \
+            --published-branch "${{ inputs.skills_repo_ref == 'main' && format('{0}/main', inputs.skill_slug) || '' }}" \
             --repo "${{ inputs.source_repo }}"
 
       - name: Post Slack notification
