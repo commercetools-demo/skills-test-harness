@@ -115,7 +115,7 @@ jobs:
           claude_args: --max-turns 200 --dangerously-skip-permissions
           allowed_bots: '*'
           plugin_marketplaces: ${{ github.workspace }}/local-marketplace
-          plugins: commercetools-demo
+          plugins: commercetools-plugin
 
       - name: Verify output exists
         id: verify-output
