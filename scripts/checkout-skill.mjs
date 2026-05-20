@@ -1,5 +1,5 @@
 import { execSync } from 'child_process';
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 
 // Parse CLI args
 const args = process.argv.slice(2);
@@ -25,29 +25,8 @@ if (!GH_TOKEN) {
 
 const clonePath = 'local-marketplace/plugins/commercetools-demo';
 
-const marketplaceJson = {
-  name: 'commercetools-demo',
-  owner: { name: 'Behnam Tehrani' },
-  version: '1',
-  displayName: 'Commercetools Demo Plugins',
-  description: 'Claude Code plugins for commercetools-related workflows',
-  plugins: [
-    {
-      name: 'commercetools-demo',
-      description: 'Starter plugin with example skills, commands, a subagent, and the commercetools Knowledge MCP server',
-      source: './plugins/commercetools-demo',
-    },
-  ],
-};
-
 try {
   execSync(`mkdir -p local-marketplace/plugins local-marketplace/.claude-plugin`, { stdio: 'inherit' });
-
-  writeFileSync(
-    'local-marketplace/.claude-plugin/marketplace.json',
-    JSON.stringify(marketplaceJson, null, 2) + '\n'
-  );
-  console.log('Wrote local-marketplace/.claude-plugin/marketplace.json');
 
   execSync(
     `git clone --depth 1 --branch "${ref}" "https://x-access-token:${GH_TOKEN}@github.com/${sourceRepo}.git" ${clonePath}`,
@@ -66,6 +45,21 @@ try {
   }
 
   console.log(`Checked out ${sourceRepo}@${ref} into ./${clonePath}/`);
+
+  // Copy marketplace.json from the source repo, repointing plugin sources to
+  // their location within the local-marketplace tree (source repo uses "./"
+  // relative to its root; here the clone lives at ./plugins/commercetools-demo).
+  const marketplace = JSON.parse(
+    readFileSync(`${clonePath}/.claude-plugin/marketplace.json`, 'utf8')
+  );
+  for (const plugin of marketplace.plugins) {
+    plugin.source = './plugins/commercetools-demo';
+  }
+  writeFileSync(
+    'local-marketplace/.claude-plugin/marketplace.json',
+    JSON.stringify(marketplace, null, 2) + '\n'
+  );
+  console.log('Copied local-marketplace/.claude-plugin/marketplace.json from source repo');
 } catch (err) {
   if (err.message) console.error('ERROR:', err.message);
   process.exit(1);
