@@ -25,5 +25,5 @@ jobs:
       extra_instructions: ${{ github.event.client_payload.extra_instructions || '' }}
       source_repo: commercetools-demo/commercetools-plugin
       publish: true
-      deploy: false
+      deploy: true
     secrets: inherit
