@@ -1,9 +1,7 @@
-import { writeFileSync } from 'fs';
 import { execSync } from 'child_process';
 
 const NETLIFY_AUTH_TOKEN = process.env.NETLIFY_AUTH_TOKEN;
 const SKILL_SLUG = process.env.SKILL_SLUG;
-const APP_DIR = process.env.APP_DIR || './output';
 const CTP_AUTH_URL = process.env.CTP_AUTH_URL;
 const CTP_API_URL = process.env.CTP_API_URL;
 const CTP_PROJECT_KEY = process.env.CTP_PROJECT_KEY;
@@ -45,13 +43,11 @@ async function netlifyFetch(path, options = {}) {
   return res.json();
 }
 
-// 4. Find existing site by name
 async function findSite(name) {
   const sites = await netlifyFetch('/sites?filter=all');
   return sites.find((s) => s.name === name) ?? null;
 }
 
-// 5. Create site if not found
 async function createSite(name) {
   console.log(`Creating Netlify site: ${name}`);
   return netlifyFetch('/sites', {
@@ -60,7 +56,6 @@ async function createSite(name) {
   });
 }
 
-// 6. Set env vars on site
 async function setSiteEnvVars(siteId) {
   const envVars = {
     CTP_AUTH_URL,
@@ -72,7 +67,6 @@ async function setSiteEnvVars(siteId) {
     SESSION_SECRET,
   };
 
-  // Build the env array format Netlify expects for PATCH /env
   const envPayload = Object.entries(envVars)
     .filter(([, v]) => v !== undefined)
     .map(([key, value]) => ({ key, value }));
@@ -84,34 +78,7 @@ async function setSiteEnvVars(siteId) {
   });
 }
 
-// 7. Deploy via zip
-async function deployZip(siteId) {
-  console.log(`Creating output.zip from ${APP_DIR}...`);
-  execSync(`cd "${APP_DIR}" && zip -r "${process.cwd()}/output.zip" .`, { stdio: 'inherit' });
-
-  const { readFileSync } = await import('fs');
-  const zipBuffer = readFileSync('./output.zip');
-
-  console.log(`Deploying zip to site ${siteId}...`);
-  const res = await fetch(`${API_BASE}/sites/${siteId}/deploys`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${NETLIFY_AUTH_TOKEN}`,
-      'Content-Type': 'application/zip',
-    },
-    body: zipBuffer,
-  });
-
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Deploy failed ${res.status} ${res.statusText}: ${body}`);
-  }
-
-  return res.json();
-}
-
 try {
-  // 4. Find or create site
   let site = await findSite(SITE_NAME);
   if (site) {
     console.log(`Found existing site: ${SITE_NAME} (${site.id})`);
@@ -120,20 +87,8 @@ try {
     console.log(`Created site: ${SITE_NAME} (${site.id})`);
   }
 
-  const siteId = site.id;
+  await setSiteEnvVars(site.id);
 
-  // 6. Set env vars
-  await setSiteEnvVars(siteId);
-
-  // 7. Deploy
-  const deploy = await deployZip(siteId);
-  const deployId = deploy.id;
-
-  // 8. Write deploy info for wait script
-  writeFileSync('netlify-deploy.json', JSON.stringify({ site_id: siteId, deploy_id: deployId }, null, 2));
-
-  // 9. Print results
-  console.log(`Deploy ID: ${deployId}`);
   console.log(`Site URL: ${site.ssl_url ?? site.url}`);
 } catch (err) {
   console.error('ERROR setting up Netlify site:', err.message ?? err);
