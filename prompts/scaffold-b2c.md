@@ -11,7 +11,7 @@ Generate a complete B2C storefront.
 5. cart
 6. checkout: create complete integration with paymentflow of commercetools checkout but keep the application key as const
 7. customer-auth
-8. search-facets
+8. search page
 9. performance
 
 ## Output location
@@ -22,7 +22,7 @@ Write ALL generated files under `./output/`. You may use subdirectories as the s
 
 **Implement all Core features**
 
-**Skip ALL Optional Features.** Do not implement: superuser, bopis, bundles, or promotions.
+**Skip ALL Optional Features.** Do not implement: superuser, bopis, bundles, facets or promotions.
 
 ## Required deliverables
 
