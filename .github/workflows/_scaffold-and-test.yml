@@ -108,6 +108,7 @@ jobs:
           PYEOF
 
       - name: Scaffold storefront with Claude Code
+        id: scaffold-claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -116,6 +117,20 @@ jobs:
           allowed_bots: '*'
           plugin_marketplaces: ${{ github.workspace }}/local-marketplace
           plugins: commercetools-plugin
+          show_full_output: 'true'
+
+      - name: Save scaffold Claude output
+        if: always()
+        run: |
+          printf '%s' '${{ steps.scaffold-claude.outputs.output }}' > scaffold-claude-output.txt
+
+      - name: Upload scaffold Claude output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: scaffold-claude-output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: scaffold-claude-output.txt
+          if-no-files-found: ignore
 
       - name: Verify output exists
         id: verify-output
@@ -207,12 +222,27 @@ jobs:
           PYEOF
 
       - name: Grade output with Claude Code (judge)
+        id: judge-claude
         uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: ${{ steps.judge-prompt.outputs.content }}
           claude_args: --dangerously-skip-permissions
           allowed_bots: '*'
+          show_full_output: 'true'
+
+      - name: Save judge Claude output
+        if: always()
+        run: |
+          printf '%s' '${{ steps.judge-claude.outputs.output }}' > judge-claude-output.txt
+
+      - name: Upload judge Claude output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: judge-claude-output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: judge-claude-output.txt
+          if-no-files-found: ignore
 
       - name: Parse judge output
         id: parse-judge
