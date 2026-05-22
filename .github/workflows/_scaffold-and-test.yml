@@ -121,8 +121,10 @@ jobs:
 
       - name: Save scaffold Claude output
         if: always()
+        env:
+          CLAUDE_OUTPUT: ${{ steps.scaffold-claude.outputs.output }}
         run: |
-          printf '%s' '${{ steps.scaffold-claude.outputs.output }}' > scaffold-claude-output.txt
+          printf '%s' "$CLAUDE_OUTPUT" > scaffold-claude-output.txt
 
       - name: Upload scaffold Claude output artifact
         if: always()
@@ -233,8 +235,10 @@ jobs:
 
       - name: Save judge Claude output
         if: always()
+        env:
+          CLAUDE_OUTPUT: ${{ steps.judge-claude.outputs.output }}
         run: |
-          printf '%s' '${{ steps.judge-claude.outputs.output }}' > judge-claude-output.txt
+          printf '%s' "$CLAUDE_OUTPUT" > judge-claude-output.txt
 
       - name: Upload judge Claude output artifact
         if: always()
