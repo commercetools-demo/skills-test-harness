@@ -156,7 +156,7 @@ jobs:
           echo "Static checks complete (warnings only, not blocking)"
 
       - name: Push output to skills-scaffold (preview branch)
-        if: always()
+        if: always() && inputs.skills_repo_ref == 'main'
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -190,6 +190,7 @@ jobs:
   # ── 2a. Judge (parallel with deploy) ────────────────────────────────────────
   judge:
     needs: scaffold
+    if: inputs.skills_repo_ref == 'main'
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
     permissions:
@@ -267,7 +268,7 @@ jobs:
     needs: scaffold
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
-    if: inputs.deploy == true
+    if: inputs.deploy == true && inputs.skills_repo_ref == 'main'
     outputs:
       preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
 
@@ -341,7 +342,8 @@ jobs:
           SCAFFOLD="${{ needs.scaffold.result }}"
           JUDGE="${{ needs.judge.result }}"
           DEPLOY="${{ needs.deploy.result }}"
-          if [ "$SCAFFOLD" = "success" ] && [ "$JUDGE" = "success" ] && \
+          if [ "$SCAFFOLD" = "success" ] && \
+             ( [ "$JUDGE" = "success" ] || [ "$JUDGE" = "skipped" ] ) && \
              ( [ "$DEPLOY" = "success" ] || [ "$DEPLOY" = "skipped" ] ); then
             echo "value=success" >> "$GITHUB_OUTPUT"
           else
