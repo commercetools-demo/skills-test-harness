@@ -351,7 +351,7 @@ jobs:
           fi
 
       - name: Publish to skills-scaffold (canonical branch)
-        if: inputs.skills_repo_ref == 'main'
+        if: inputs.skills_repo_ref == 'main' && needs.judge.result == 'success'
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -362,6 +362,20 @@ jobs:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           SKILL_SLUG: ${{ inputs.skill_slug }}
           HARNESS_SHA: ${{ github.sha }}
+
+      - name: Push to scaffold branch (non-main)
+        if: inputs.skills_repo_ref != 'main'
+        run: |
+          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
+            echo "output/ is empty — nothing to push"
+            exit 0
+          fi
+          node scripts/push-to-generated-repo.mjs
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+          HARNESS_SHA: ${{ github.sha }}
+          TARGET_BRANCH: ${{ inputs.skill_slug }}/${{ inputs.skills_repo_ref }}
 
       - name: Update check run with result
         env:
