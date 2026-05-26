@@ -15,7 +15,7 @@ Then read these key source files in full (if they exist):
 - `./output/README.md`
 - `./output/package.json`
 
-Check that `./output/package.json` declares a `next` dependency with a version greater than 16. If the version is 16 or below, or if no `next` dependency is present, treat this as a **critical violation** named `"next dependency > 16"`.
+Check that `./output/package.json` declares a `next` dependency with a major version of 16 or above. If the major version is below 16, or if no `next` dependency is present, treat this as a **critical violation** named `"next dependency >= 16"`.
 
 ## Step 2 — Read the criteria
 
