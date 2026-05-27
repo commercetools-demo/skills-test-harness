@@ -12,7 +12,7 @@ Generate a complete B2C storefront.
 6. checkout: create complete integration with paymentflow of commercetools checkout but keep the application key as const
 7. customer-auth
 8. search page + facets
-9. performance
+9. wishlist
 
 ## Output location
 
