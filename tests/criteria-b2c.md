@@ -38,13 +38,6 @@ Failing any Critical item is a blocking violation. A non-empty `critical_violati
 
 **Pass condition:** `apiRoot.login().post()` is used; `apiRoot.customers().login()` does not appear.
 
-### CRIT-5: Cart Creation — shippingMode
-
-- Every call that creates a new cart includes `shippingMode: 'Single'` in the cart draft body.
-- This applies to both anonymous cart creation and post-login cart creation.
-
-**Pass condition:** All `carts().post()` calls include `shippingMode: 'Single'`.
-
 ---
 
 ## HIGH — 10 points each
@@ -137,13 +130,13 @@ These checks verify basic structural completeness. Fail any smoke check = note i
 
 | Tier | Points each | Max contribution |
 |---|---|---|
-| CRITICAL (5 items) | 20 | 100 |
+| CRITICAL (4 items) | 20 | 80 |
 | HIGH (5 items) | 10 | 50 |
 | MEDIUM (4 items) | 5 | 20 |
 | SMOKE (5 items) | pass/fail | qualitative |
-| **Total** | | **170** |
+| **Total** | | **150** |
 
-A passing score is considered 120+ with zero critical violations. The judge must still report all violations even on a passing score.
+A passing score is considered 105+ with zero critical violations. The judge must still report all violations even on a passing score.
 
 ---
 

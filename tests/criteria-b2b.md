@@ -30,12 +30,12 @@ Failing any Critical item is a blocking violation. A non-empty `critical_violati
 
 **Pass condition:** All five fields are populated together from a single `getStoreChannelData` / store-context lookup and written to session atomically.
 
-### CRIT-3: Four-Field Locale Atomicity
+### CRIT-3: Three-Field Locale Atomicity
 
-- The four locale/currency fields — `locale`, `urlLocale`, `currency`, `country` — are always updated together in a single session write. No partial updates.
+- The three locale/currency fields — `locale`, `currency`, `country` — are always updated together in a single session write. No partial updates.
 - When locale or currency changes, `cartId` is removed from the session (a cart scoped to the old currency must not be reused).
 
-**Pass condition:** All locale switch logic updates all four fields atomically and clears `cartId`.
+**Pass condition:** All locale switch logic updates all three fields atomically and clears `cartId`
 
 ### CRIT-4: Session Passed to Product Queries
 

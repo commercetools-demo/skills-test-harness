@@ -227,22 +227,19 @@ done < <(grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
   "$OUTPUT_DIR" 2>/dev/null || true)
 
 # ---------------------------------------------------------------------------
-# CHECK 10: session.locale used in URL routing context (should be session.urlLocale)
+# CHECK 10: session.urlLocale used anywhere (B2B uses session.locale only)
 # ---------------------------------------------------------------------------
 log ""
-log "--- CHECK 10: session.locale used in routing/URL context (should be session.urlLocale for URL params) ---"
+log "--- CHECK 10: session.urlLocale used (B2B does not use urlLocale — always use session.locale) ---"
 while IFS= read -r match; do
   [[ -z "$match" ]] && continue
   file="${match%%:*}"
   rest="${match#*:}"
   lineno="${rest%%:*}"
   content="${rest#*:}"
-  # Flag session.locale used in redirect, pathname, or URL-building contexts
-  if echo "$content" | grep -qE 'redirect|pathname|router\.push|href.*session\.locale|session\.locale.*href|params.*session\.locale'; then
-    warn "SESSION_LOCALE_IN_URL_CONTEXT" "$file:$lineno" "$content"
-  fi
+  warn "URLOCALE_IN_B2B" "$file:$lineno" "$content"
 done < <(grep -rn --include="*.ts" --include="*.tsx" --include="*.js" \
-  'session\.locale' \
+  'urlLocale' \
   "$OUTPUT_DIR" 2>/dev/null || true)
 
 # ===========================================================================
