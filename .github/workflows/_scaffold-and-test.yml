@@ -202,6 +202,7 @@ jobs:
       critical_count: ${{ steps.parse-judge.outputs.critical_count }}
       high_count: ${{ steps.parse-judge.outputs.high_count }}
       medium_count: ${{ steps.parse-judge.outputs.medium_count }}
+      passed: ${{ steps.parse-judge.outputs.passed }}
 
     steps:
       - name: Checkout harness
@@ -314,7 +315,10 @@ jobs:
     needs: [scaffold, judge]
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
-    if: inputs.skills_repo_ref == 'main' && needs.judge.result == 'failure'
+    if: >-
+      inputs.skills_repo_ref == 'main' &&
+      needs.scaffold.result == 'success' &&
+      needs.judge.outputs.passed == 'false'
     permissions:
       id-token: write
       contents: write
@@ -444,6 +448,7 @@ jobs:
       critical_count: ${{ steps.parse-judge2.outputs.critical_count }}
       high_count: ${{ steps.parse-judge2.outputs.high_count }}
       medium_count: ${{ steps.parse-judge2.outputs.medium_count }}
+      passed: ${{ steps.parse-judge2.outputs.passed }}
 
     steps:
       - name: Checkout harness
@@ -516,7 +521,7 @@ jobs:
       inputs.deploy == true &&
       inputs.skills_repo_ref == 'main' &&
       needs.scaffold.result == 'success' &&
-      (needs.judge.result == 'success' || needs.judge2.result == 'success')
+      (needs.judge.outputs.passed == 'true' || needs.judge2.outputs.passed == 'true')
     outputs:
       preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
 
@@ -593,7 +598,7 @@ jobs:
         continue-on-error: true
 
       - name: Download judge2 result (overwrites judge result if present)
-        if: needs.judge2.result == 'success'
+        if: needs.judge2.result == 'success' || needs.judge2.result == 'failure'
         uses: actions/download-artifact@v4
         with:
           name: judge2-result-${{ inputs.skill_slug }}-${{ github.run_id }}
@@ -603,13 +608,13 @@ jobs:
         id: status
         run: |
           SCAFFOLD="${{ needs.scaffold.result }}"
-          JUDGE="${{ needs.judge.result }}"
-          JUDGE2="${{ needs.judge2.result }}"
+          JUDGE_PASSED="${{ needs.judge.outputs.passed }}"
+          JUDGE2_PASSED="${{ needs.judge2.outputs.passed }}"
           DEPLOY="${{ needs.deploy.result }}"
           DEPLOY_MAIN="${{ needs.deploy_main.result }}"
 
           JUDGE_OK="false"
-          if [ "$JUDGE" = "success" ] || [ "$JUDGE2" = "success" ]; then JUDGE_OK="true"; fi
+          if [ "$JUDGE_PASSED" = "true" ] || [ "$JUDGE2_PASSED" = "true" ]; then JUDGE_OK="true"; fi
 
           DEPLOY_OK="false"
           if [ "$DEPLOY" = "success" ] || [ "$DEPLOY" = "skipped" ]; then DEPLOY_OK="true"; fi
@@ -626,7 +631,7 @@ jobs:
       - name: Publish to skills-scaffold (canonical branch)
         if: >-
           inputs.skills_repo_ref == 'main' &&
-          (needs.judge.result == 'success' || needs.judge2.result == 'success')
+          (needs.judge.outputs.passed == 'true' || needs.judge2.outputs.passed == 'true')
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
