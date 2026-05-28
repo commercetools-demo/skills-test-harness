@@ -25,8 +25,18 @@ A server component is any `.tsx` file that does NOT have `'use client'` at the t
 
 For all other critical and high violations listed in `judge-result.json`, read the evidence and apply whatever fix is needed to satisfy the criterion.
 
-## Step 4 — Write a summary
+## Step 4 — Run type checking
+
+From the `./output/` directory, run:
+
+```
+npx tsc --noEmit
+```
+
+If there are type errors, fix them before proceeding. Re-run until the output is clean.
+
+## Step 5 — Write a summary
 
 After all fixes are applied, write `refactor-summary.txt` listing each violation fixed and the change made (one line per fix).
 
-**Edit files only under `./output/`. Do not run npm, build, or install commands.**
+**Do not run npm install or build commands.**
