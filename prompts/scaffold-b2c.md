@@ -1,16 +1,16 @@
 This is an automated CI run. Do not ask any questions, request clarification, or wait for user input at any point. Make reasonable assumptions and proceed autonomously to completion.
 
-Generate a complete B2C storefront.
+Generate a complete production ready B2C storefront connected to commercetools.
 
-## Build order
+## Required features
 
-1. project-setup
-2. simple home page
+1. simple home page
+2. use new product search api
 3. product-listing + facets
 4. product-detail
 5. cart
 6. checkout: create complete integration with paymentflow of commercetools checkout but keep the application key as const
-7. customer-auth
+7. customer authentication and registration
 8. search page + facets
 9. wishlist
 

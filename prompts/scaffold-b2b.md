@@ -1,29 +1,24 @@
 This is an automated CI run. Do not ask any questions, request clarification, or wait for user input at any point. Make reasonable assumptions and proceed autonomously to completion.
 
-Generate a complete B2B storefront.
+Generate a complete production ready B2B storefront connected to commercetools.
 
 ## Output location
 
 Write ALL generated files under `./output/`. You may use subdirectories as the skill prescribes (e.g. `output/site/`, `output/tools/`). The Next.js app root must contain a `package.json`.
 
-## Build order
 
-Follow the **Core — B2B Foundation** section of SKILL.md exactly, executing each phase in this order:
+## Required features
 
-1. project-setup
-2. session-and-bu
-3. product-listing
-4. product-detail
-5. cart
-6. checkout
-7. customer-auth
-8. permissions
 
-After completing all Core phases, implement these **B2B Feature Modules** in order:
-
-1. quotes
-2. approval-workflows
-3. dashboard
+1. Business unit dashbaord
+2. product-listing
+3. product-detail
+4. cart
+5. checkout
+6. customer authentication
+7. Approval rules and workflows
+8. Purchase lists
+9. Quotes
 
 Complete each phase fully before starting the next.
 
