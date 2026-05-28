@@ -509,55 +509,9 @@ jobs:
           path: judge-result.json
           if-no-files-found: ignore
 
-  # ── 5. Deploy main — main only, after judge chain passes ────────────────────
-  # Path B step 5: wait for Netlify preview deploy (code was pushed in scaffold
-  # or refactor), run tests, before canonical branch push in finalize
-  deploy_main:
-    needs: [scaffold, judge, refactor, judge2]
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.skill_slug }}
-    if: >-
-      always() &&
-      inputs.deploy == true &&
-      inputs.skills_repo_ref == 'main' &&
-      needs.scaffold.result == 'success' &&
-      (needs.judge.outputs.passed == 'true' || needs.judge2.outputs.passed == 'true')
-    outputs:
-      preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
-
-    steps:
-      - name: Checkout harness
-        uses: actions/checkout@v4
-
-      - name: Wait for Netlify deploy
-        id: wait-deploy
-        run: node scripts/wait-for-netlify-deploy.mjs
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          SKILL_SLUG: ${{ inputs.skill_slug }}
-          TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
-
-      - name: Run Playwright E2E tests
-        if: false
-        run: |
-          cd tests/playwright
-          npm ci
-          npx playwright install --with-deps chromium
-          npx playwright test ${{ inputs.skill_slug }}/
-        env:
-          BASE_URL: ${{ steps.wait-deploy.outputs.preview_url }}
-
-      - name: Upload Playwright report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: playwright-main-${{ inputs.skill_slug }}-${{ github.run_id }}
-          path: tests/playwright/playwright-report/
-          if-no-files-found: ignore
-
-  # ── 6. Finalize ──────────────────────────────────────────────────────────────
+  # ── 5. Finalize ──────────────────────────────────────────────────────────────
   finalize:
-    needs: [scaffold, judge, deploy, refactor, judge2, deploy_main]
+    needs: [scaffold, judge, deploy, refactor, judge2]
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
     if: always()
@@ -611,14 +565,11 @@ jobs:
           JUDGE_PASSED="${{ needs.judge.outputs.passed }}"
           JUDGE2_PASSED="${{ needs.judge2.outputs.passed }}"
           DEPLOY="${{ needs.deploy.result }}"
-          DEPLOY_MAIN="${{ needs.deploy_main.result }}"
-
           JUDGE_OK="false"
           if [ "$JUDGE_PASSED" = "true" ] || [ "$JUDGE2_PASSED" = "true" ]; then JUDGE_OK="true"; fi
 
           DEPLOY_OK="false"
           if [ "$DEPLOY" = "success" ] || [ "$DEPLOY" = "skipped" ]; then DEPLOY_OK="true"; fi
-          if [ "$DEPLOY_MAIN" = "success" ] || [ "$DEPLOY_MAIN" = "skipped" ]; then DEPLOY_OK="true"; fi
 
           if [ "$SCAFFOLD" = "success" ] && [ "$JUDGE_OK" = "true" ] && [ "$DEPLOY_OK" = "true" ]; then
             echo "value=success" >> "$GITHUB_OUTPUT"
@@ -666,7 +617,7 @@ jobs:
             --status "${{ steps.status.outputs.value }}" \
             --skill-slug "${{ inputs.skill_slug }}" \
             --judge-output judge-result.json \
-            --preview-url "${{ needs.deploy_main.outputs.preview_url || needs.deploy.outputs.preview_url }}" \
+            --preview-url "${{ needs.deploy.outputs.preview_url }}" \
             --published-branch "${{ steps.status.outputs.published_branch }}" \
             --repo "${{ inputs.source_repo }}"
 
@@ -677,7 +628,7 @@ jobs:
           node scripts/post-slack-notification.mjs \
             --skill-slug "${{ inputs.skill_slug }}" \
             --skill-name "${{ inputs.skill_name }}" \
-            --preview-url "${{ needs.deploy_main.outputs.preview_url || needs.deploy.outputs.preview_url }}" \
+            --preview-url "${{ needs.deploy.outputs.preview_url }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --status "${{ steps.status.outputs.value }}" \
             --skills-ref "${{ inputs.skills_repo_ref }}"
