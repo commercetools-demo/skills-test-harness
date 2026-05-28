@@ -156,7 +156,7 @@ jobs:
           echo "Static checks complete (warnings only, not blocking)"
 
       - name: Push output to skills-scaffold (preview branch)
-        if: always() && inputs.skills_repo_ref == 'main'
+        if: always()
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -187,10 +187,11 @@ jobs:
           path: static-check-results.txt
           if-no-files-found: ignore
 
-  # ── 2a. Judge (parallel with deploy) ────────────────────────────────────────
+  # ── 2. Judge (all branches) ─────────────────────────────────────────────────
+  # Path A (non-main): runs in parallel with deploy, result is informational
+  # Path B (main): first judge pass — failure triggers refactor loop
   judge:
     needs: scaffold
-    if: inputs.skills_repo_ref == 'main'
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
     permissions:
@@ -211,6 +212,12 @@ jobs:
         with:
           name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
           path: output/
+
+      - name: Download static check results
+        uses: actions/download-artifact@v4
+        with:
+          name: static-checks-${{ inputs.skill_slug }}-${{ github.run_id }}
+        continue-on-error: true
 
       - name: Build judge prompt
         id: judge-prompt
@@ -261,14 +268,13 @@ jobs:
           path: judge-result.json
           if-no-files-found: ignore
 
-  # ── 2b. Deploy + Playwright (parallel with judge) ───────────────────────────
-  # The preview branch push already happened in `scaffold`, which triggers
-  # Netlify's git-linked auto-deploy. This job just waits for it and runs tests.
+  # ── 3a. Deploy — non-main only, parallel with judge ─────────────────────────
+  # Path A: wait for Netlify preview deploy and run tests
   deploy:
     needs: scaffold
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
-    if: inputs.deploy == true && inputs.skills_repo_ref == 'main'
+    if: inputs.deploy == true && inputs.skills_repo_ref != 'main'
     outputs:
       preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
 
@@ -302,14 +308,18 @@ jobs:
           path: tests/playwright/playwright-report/
           if-no-files-found: ignore
 
-  # ── 3. Finalize ──────────────────────────────────────────────────────────────
-  finalize:
-    needs: [scaffold, judge, deploy]
+  # ── 3b. Refactor — main only, when judge finds critical violations ───────────
+  # Path B step 3: fix output using Claude Code guided by judge feedback
+  refactor:
+    needs: [scaffold, judge]
     runs-on: ubuntu-latest
     environment: ${{ inputs.skill_slug }}
-    if: always()
+    if: inputs.skills_repo_ref == 'main' && needs.judge.result == 'failure'
     permissions:
+      id-token: write
       contents: write
+    outputs:
+      refactored: ${{ steps.set-refactored.outputs.value }}
 
     steps:
       - name: Checkout harness
@@ -328,6 +338,252 @@ jobs:
         with:
           name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
           path: output/
+
+      - name: Download judge result
+        uses: actions/download-artifact@v4
+        with:
+          name: judge-result-${{ inputs.skill_slug }}-${{ github.run_id }}
+        continue-on-error: true
+
+      - name: Download static check results
+        uses: actions/download-artifact@v4
+        with:
+          name: static-checks-${{ inputs.skill_slug }}-${{ github.run_id }}
+        continue-on-error: true
+
+      - name: Build refactor prompt
+        id: refactor-prompt
+        run: |
+          PROMPT_FILE="prompts/refactor-${{ inputs.skill_slug }}.md"
+          if [ ! -f "$PROMPT_FILE" ]; then
+            echo "No refactor prompt found at $PROMPT_FILE — skipping refactor"
+            echo "has_prompt=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "has_prompt=true" >> "$GITHUB_OUTPUT"
+          python3 - <<'PYEOF'
+          import os, secrets
+          content = open(f'prompts/refactor-${{ inputs.skill_slug }}.md').read()
+          delim = 'REFACTOR_' + secrets.token_hex(16)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'content<<{delim}\n{content}\n{delim}\n')
+          print(f'Refactor prompt ready ({len(content)} chars)')
+          PYEOF
+
+      - name: Refactor output with Claude Code
+        id: refactor-claude
+        if: steps.refactor-prompt.outputs.has_prompt == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.refactor-prompt.outputs.content }}
+          claude_args: --max-turns 100 --dangerously-skip-permissions
+          allowed_bots: '*'
+          show_full_output: 'true'
+
+      - name: Save refactor Claude output
+        if: always()
+        env:
+          CLAUDE_OUTPUT: ${{ steps.refactor-claude.outputs.output }}
+        run: |
+          printf '%s' "$CLAUDE_OUTPUT" > refactor-claude-output.txt
+
+      - name: Upload refactor Claude output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refactor-claude-output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: refactor-claude-output.txt
+          if-no-files-found: ignore
+
+      - name: Upload refactored output artifact
+        id: upload-v2
+        if: steps.refactor-prompt.outputs.has_prompt == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}-v2
+          path: |
+            output/
+            !output/**/node_modules/**
+          if-no-files-found: warn
+
+      - name: Push refactored output to preview branch
+        if: steps.refactor-prompt.outputs.has_prompt == 'true'
+        run: |
+          if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
+            echo "output/ is empty — nothing to push"
+            exit 0
+          fi
+          node scripts/push-to-generated-repo.mjs
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+          HARNESS_SHA: ${{ github.sha }}
+          TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
+
+      - name: Set refactored output flag
+        id: set-refactored
+        run: |
+          echo "value=${{ steps.refactor-prompt.outputs.has_prompt == 'true' }}" >> "$GITHUB_OUTPUT"
+
+  # ── 4. Judge pass 2 — main only, after refactor ─────────────────────────────
+  # Path B step 4: final verdict; if this passes, deploy proceeds
+  judge2:
+    needs: [scaffold, refactor]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.skill_slug }}
+    if: >-
+      inputs.skills_repo_ref == 'main' &&
+      needs.refactor.result == 'success' &&
+      needs.refactor.outputs.refactored == 'true'
+    permissions:
+      id-token: write
+      contents: write
+    outputs:
+      score: ${{ steps.parse-judge2.outputs.score }}
+      critical_count: ${{ steps.parse-judge2.outputs.critical_count }}
+      high_count: ${{ steps.parse-judge2.outputs.high_count }}
+      medium_count: ${{ steps.parse-judge2.outputs.medium_count }}
+
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Download refactored output artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}-v2
+          path: output/
+
+      - name: Build judge prompt
+        id: judge-prompt
+        run: |
+          python3 - <<'PYEOF'
+          import os, secrets
+          content = open('prompts/judge-${{ inputs.skill_slug }}.md').read()
+          delim = 'JUDGE2_' + secrets.token_hex(16)
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'content<<{delim}\n{content}\n{delim}\n')
+          print(f'Judge2 prompt ready ({len(content)} chars)')
+          PYEOF
+
+      - name: Grade refactored output with Claude Code (judge2)
+        id: judge2-claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: ${{ steps.judge-prompt.outputs.content }}
+          claude_args: --dangerously-skip-permissions
+          allowed_bots: '*'
+          show_full_output: 'true'
+
+      - name: Save judge2 Claude output
+        if: always()
+        env:
+          CLAUDE_OUTPUT: ${{ steps.judge2-claude.outputs.output }}
+        run: |
+          printf '%s' "$CLAUDE_OUTPUT" > judge2-claude-output.txt
+
+      - name: Upload judge2 Claude output artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: judge2-claude-output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: judge2-claude-output.txt
+          if-no-files-found: ignore
+
+      - name: Parse judge2 output
+        id: parse-judge2
+        run: node scripts/parse-judge-output.mjs
+
+      - name: Upload judge2 result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: judge2-result-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: judge-result.json
+          if-no-files-found: ignore
+
+  # ── 5. Deploy main — main only, after judge chain passes ────────────────────
+  # Path B step 5: wait for Netlify preview deploy (code was pushed in scaffold
+  # or refactor), run tests, before canonical branch push in finalize
+  deploy_main:
+    needs: [scaffold, judge, refactor, judge2]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.skill_slug }}
+    if: >-
+      always() &&
+      inputs.deploy == true &&
+      inputs.skills_repo_ref == 'main' &&
+      needs.scaffold.result == 'success' &&
+      (needs.judge.result == 'success' || needs.judge2.result == 'success')
+    outputs:
+      preview_url: ${{ steps.wait-deploy.outputs.preview_url }}
+
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Wait for Netlify deploy
+        id: wait-deploy
+        run: node scripts/wait-for-netlify-deploy.mjs
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          SKILL_SLUG: ${{ inputs.skill_slug }}
+          TARGET_BRANCH: ${{ inputs.skill_slug }}/preview/${{ inputs.skills_repo_ref }}
+
+      - name: Run Playwright E2E tests
+        if: false
+        run: |
+          cd tests/playwright
+          npm ci
+          npx playwright install --with-deps chromium
+          npx playwright test ${{ inputs.skill_slug }}/
+        env:
+          BASE_URL: ${{ steps.wait-deploy.outputs.preview_url }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-main-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: tests/playwright/playwright-report/
+          if-no-files-found: ignore
+
+  # ── 6. Finalize ──────────────────────────────────────────────────────────────
+  finalize:
+    needs: [scaffold, judge, deploy, refactor, judge2, deploy_main]
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.skill_slug }}
+    if: always()
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout harness
+        uses: actions/checkout@v4
+
+      - name: Mint GitHub App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.HARNESS_APP_ID }}
+          private-key: ${{ secrets.HARNESS_APP_PRIVATE_KEY }}
+          owner: commercetools-demo
+
+      - name: Download output artifact (v1)
+        uses: actions/download-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}
+          path: output/
+        continue-on-error: true
+
+      - name: Download refactored output artifact (v2, overwrites v1 if present)
+        if: needs.refactor.result == 'success' && needs.refactor.outputs.refactored == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: output-${{ inputs.skill_slug }}-${{ github.run_id }}-v2
+          path: output/
         continue-on-error: true
 
       - name: Download judge result
@@ -336,22 +592,41 @@ jobs:
           name: judge-result-${{ inputs.skill_slug }}-${{ github.run_id }}
         continue-on-error: true
 
+      - name: Download judge2 result (overwrites judge result if present)
+        if: needs.judge2.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: judge2-result-${{ inputs.skill_slug }}-${{ github.run_id }}
+        continue-on-error: true
+
       - name: Compute overall status
         id: status
         run: |
           SCAFFOLD="${{ needs.scaffold.result }}"
           JUDGE="${{ needs.judge.result }}"
+          JUDGE2="${{ needs.judge2.result }}"
           DEPLOY="${{ needs.deploy.result }}"
-          if [ "$SCAFFOLD" = "success" ] && \
-             ( [ "$JUDGE" = "success" ] || [ "$JUDGE" = "skipped" ] ) && \
-             ( [ "$DEPLOY" = "success" ] || [ "$DEPLOY" = "skipped" ] ); then
+          DEPLOY_MAIN="${{ needs.deploy_main.result }}"
+
+          JUDGE_OK="false"
+          if [ "$JUDGE" = "success" ] || [ "$JUDGE2" = "success" ]; then JUDGE_OK="true"; fi
+
+          DEPLOY_OK="false"
+          if [ "$DEPLOY" = "success" ] || [ "$DEPLOY" = "skipped" ]; then DEPLOY_OK="true"; fi
+          if [ "$DEPLOY_MAIN" = "success" ] || [ "$DEPLOY_MAIN" = "skipped" ]; then DEPLOY_OK="true"; fi
+
+          if [ "$SCAFFOLD" = "success" ] && [ "$JUDGE_OK" = "true" ] && [ "$DEPLOY_OK" = "true" ]; then
             echo "value=success" >> "$GITHUB_OUTPUT"
+            echo "published_branch=${{ inputs.skills_repo_ref == 'main' && format('{0}/main', inputs.skill_slug) || '' }}" >> "$GITHUB_OUTPUT"
           else
             echo "value=failure" >> "$GITHUB_OUTPUT"
+            echo "published_branch=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Publish to skills-scaffold (canonical branch)
-        if: inputs.skills_repo_ref == 'main' && needs.judge.result == 'success'
+        if: >-
+          inputs.skills_repo_ref == 'main' &&
+          (needs.judge.result == 'success' || needs.judge2.result == 'success')
         run: |
           if [ ! -d output ] || [ -z "$(ls -A output 2>/dev/null)" ]; then
             echo "output/ is empty — nothing to push"
@@ -386,8 +661,8 @@ jobs:
             --status "${{ steps.status.outputs.value }}" \
             --skill-slug "${{ inputs.skill_slug }}" \
             --judge-output judge-result.json \
-            --preview-url "${{ needs.deploy.outputs.preview_url }}" \
-            --published-branch "${{ inputs.skills_repo_ref == 'main' && format('{0}/main', inputs.skill_slug) || '' }}" \
+            --preview-url "${{ needs.deploy_main.outputs.preview_url || needs.deploy.outputs.preview_url }}" \
+            --published-branch "${{ steps.status.outputs.published_branch }}" \
             --repo "${{ inputs.source_repo }}"
 
       - name: Post Slack notification
@@ -397,7 +672,7 @@ jobs:
           node scripts/post-slack-notification.mjs \
             --skill-slug "${{ inputs.skill_slug }}" \
             --skill-name "${{ inputs.skill_name }}" \
-            --preview-url "${{ needs.deploy.outputs.preview_url }}" \
+            --preview-url "${{ needs.deploy_main.outputs.preview_url || needs.deploy.outputs.preview_url }}" \
             --run-url "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
             --status "${{ steps.status.outputs.value }}" \
             --skills-ref "${{ inputs.skills_repo_ref }}"

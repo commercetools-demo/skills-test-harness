@@ -61,6 +61,29 @@ Failing any Critical item is a blocking violation. A non-empty `critical_violati
 
 **Pass condition:** Zero client files import from `lib/ct/`. No `NEXT_PUBLIC_CTP*` vars present.
 
+### CRIT-7: Localized Product Strings
+
+- Product string fields — `name`, `description`, `slug`, and any other localizable CT fields — are never accessed directly from CT API response objects (e.g. `product.name`, `lineItem.name`, `product.description`).
+- All such fields are retrieved through a localized helper utility that lives in `lib/ct/` (e.g. `getLocalizedString`, `localizeField`, or equivalent).
+- This applies everywhere product data is consumed: product detail pages, cart, order confirmation, search/listing pages, and shared product card components.
+
+**Pass condition:** No direct access to localizable CT fields outside of `lib/ct/`; a localized utility function exists and is used consistently.
+
+### CRIT-8: No `'use client'` in page.tsx Files
+
+- No file named `page.tsx` (anywhere in the `app/` directory) contains `'use client'` at the top.
+- If a page requires client-side interactivity, the interactive logic must be extracted into a separate client component file that carries `'use client'`.
+
+**Pass condition:** Zero `page.tsx` files contain `'use client'`.
+
+### CRIT-9: No Interactive Elements in Server Components
+
+- Files that are NOT named `page.tsx` AND do NOT contain `'use client'` are server components.
+- Server components must not render `<select>` or `<input>` JSX elements directly; doing so causes a runtime error because these elements require browser APIs.
+- Any `<select>` or `<input>` must live inside a file that has `'use client'` at the top.
+
+**Pass condition:** No `.tsx` server component file contains a `<select` or `<input` JSX element in its render output.
+
 ---
 
 ## HIGH — 10 points each
@@ -161,13 +184,13 @@ Failing any Critical item is a blocking violation. A non-empty `critical_violati
 
 | Tier | Points each | Max contribution |
 |---|---|---|
-| CRITICAL (6 items) | 20 | 120 |
+| CRITICAL (9 items) | 20 | 180 |
 | HIGH (5 items) | 10 | 50 |
 | MEDIUM (5 items) | 5 | 25 |
 | SMOKE (6 items) | pass/fail | qualitative |
-| **Total** | | **195** |
+| **Total** | | **255** |
 
-A passing score is considered 140+ with zero critical violations. The judge must still report all violations even on a passing score.
+A passing score is considered 185+ with zero critical violations. The judge must still report all violations even on a passing score.
 
 ---
 
