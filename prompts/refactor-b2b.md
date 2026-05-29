@@ -23,6 +23,10 @@ Work through the violations one by one. For each:
 - Apply the minimal change needed to resolve it
 - Do not refactor unrelated code or change working functionality
 
+## Output location
+
+Write ALL generated files for the Next.js app under `./output/site/`. You may use subdirectories as the skill prescribes (e.g. `output/site/`, `output/tools/`). The Next.js app root must contain a `package.json`.
+
 ## Step 5 — Run type checking
 
 From the app root directory located in Step 1, run:

@@ -31,6 +31,10 @@ A server component is any `.tsx` file that does NOT have `'use client'` at the t
 
 For all other critical and high violations listed in `judge-result.json`, read the evidence and apply whatever fix is needed to satisfy the criterion.
 
+## Output location
+
+Write ALL generated files for the Next.js app under `./output/site/`. You may use subdirectories as the skill prescribes (e.g. `output/site/`, `output/tools/`). The Next.js app root must contain a `package.json`.
+
 ## Step 5 — Run type checking
 
 From the app root directory located in Step 1, run:
